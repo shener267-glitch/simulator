@@ -8,7 +8,14 @@ body,
   height: 100%;
 }
 
+html {
+  /* Stop iOS Safari from inflating text when the phone is rotated. */
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   background-color: #0f172a;
   color: #e2e8f0;
+  /* Kill the rubber-band bounce so the sticky action bar stays put. */
+  overscroll-behavior-y: none;
 }

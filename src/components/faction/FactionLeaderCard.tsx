@@ -17,13 +17,13 @@ export function FactionLeaderCard({ faction }: { faction: FactionState }) {
         highPressure ? "border-rose-600 bg-rose-950/30" : "border-slate-700 bg-slate-800"
       }`}
     >
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <span className="font-semibold text-slate-100">
           {faction.name}({PERSONALITY_LABELS[faction.personality]})
         </span>
         <span className="text-sm text-slate-400">領袖: {faction.leaderName}</span>
       </div>
-      <span className="text-xs text-slate-500">議席シェア {Math.round(faction.seatShare * 100)}%</span>
+      <span className="text-sm text-slate-500">議席シェア {Math.round(faction.seatShare * 100)}%</span>
       <ProgressBar label="忠誠度" value={faction.loyalty} colorClassName="bg-indigo-500" />
       <ProgressBar
         label="造反圧力"
@@ -31,7 +31,7 @@ export function FactionLeaderCard({ faction }: { faction: FactionState }) {
         colorClassName={highPressure ? "bg-rose-500" : "bg-amber-500"}
       />
       {highPressure && (
-        <p className="text-xs font-semibold text-rose-400">
+        <p className="text-sm font-semibold text-rose-400">
           造反の動きが強まっています。内閣改造などの対応が必要です。
         </p>
       )}

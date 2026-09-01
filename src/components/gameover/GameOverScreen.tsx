@@ -13,7 +13,7 @@ export function GameOverScreen() {
   const title = TITLES[state.status] ?? "内閣総辞職";
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col gap-4 p-6 text-center">
+    <div className="mx-auto flex max-w-xl flex-col gap-4 px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-8 text-center sm:p-6">
       <h1 className="text-2xl font-bold text-rose-400">{title}</h1>
       <p className="text-slate-300">{state.gameOverReason}</p>
       <div className="rounded-lg border border-slate-700 bg-slate-800 p-4 text-left text-sm text-slate-300">
@@ -25,7 +25,7 @@ export function GameOverScreen() {
       <button
         type="button"
         onClick={() => dispatch({ type: "NEW_GAME" })}
-        className="rounded-md bg-sky-600 px-4 py-2 font-medium text-white hover:bg-sky-500"
+        className="w-full rounded-md bg-sky-600 px-4 py-3 font-medium text-white hover:bg-sky-500"
       >
         もう一度プレイする
       </button>
