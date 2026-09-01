@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useGameState, useGameDispatch } from "../../state/GameContext";
 import { FactionLeaderCard } from "./FactionLeaderCard";
 import { ReshuffleModal } from "./ReshuffleModal";
+import { ScreenContainer } from "../shared/ScreenContainer";
+import { ScreenHeader } from "../shared/ScreenHeader";
 import type { PlayerScreen } from "../../App";
 
 const RESHUFFLE_COOLDOWN_ID = "cabinet_reshuffle";
@@ -15,17 +17,8 @@ export function FactionScreen({ onNavigate }: { onNavigate: (screen: PlayerScree
   const onCooldown = readyAt !== undefined && state.date.dayIndex < readyAt;
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-slate-100">党内・内閣</h1>
-        <button
-          type="button"
-          onClick={() => onNavigate("dashboard")}
-          className="text-sm text-slate-400 hover:text-slate-100"
-        >
-          戻る
-        </button>
-      </div>
+    <ScreenContainer>
+      <ScreenHeader title="党内・内閣" onBack={() => onNavigate("dashboard")} />
 
       <div className="flex flex-col gap-3">
         {Object.values(state.factions).map((faction) => (
@@ -56,6 +49,6 @@ export function FactionScreen({ onNavigate }: { onNavigate: (screen: PlayerScree
           }}
         />
       )}
-    </div>
+    </ScreenContainer>
   );
 }

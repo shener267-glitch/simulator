@@ -22,7 +22,7 @@ export function PolicyAreaCard({ area, onCooldown, readyAtDayIndex, onSelect }: 
       <span className="font-semibold text-slate-100">{area.name}</span>
       <span className="text-sm text-slate-400">{area.description}</span>
       {onCooldown && (
-        <span className="mt-1 text-xs text-amber-400">Day {readyAtDayIndex} まで再検討できません</span>
+        <span className="mt-1 text-sm text-amber-400">Day {readyAtDayIndex} まで再検討できません</span>
       )}
     </button>
   );

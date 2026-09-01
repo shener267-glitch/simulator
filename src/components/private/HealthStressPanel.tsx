@@ -10,10 +10,10 @@ export function HealthStressPanel() {
       <ProgressBar label="健康" value={stats.health} colorClassName="bg-teal-500" />
       <ProgressBar label="ストレス" value={stats.stress} colorClassName="bg-orange-500" />
       {stats.stress > 70 && (
-        <p className="text-xs text-rose-400">ストレスが高く、健康を損ないやすくなっています。</p>
+        <p className="text-sm text-rose-400">ストレスが高く、健康を損ないやすくなっています。</p>
       )}
       {stats.health < 30 && (
-        <p className="text-xs font-semibold text-rose-400">
+        <p className="text-sm font-semibold text-rose-400">
           健康状態が危険水域です。療養しないと執務の継続が困難になります。
         </p>
       )}

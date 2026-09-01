@@ -14,24 +14,24 @@ export function StatBars() {
       <ProgressBar label="スキャンダルリスク" value={stats.scandalRisk} colorClassName="bg-rose-500" />
 
       <div className="flex flex-col justify-center gap-1 rounded-md bg-slate-900/40 p-2 text-sm">
-        <div className="flex justify-between text-slate-300">
+        <div className="flex flex-wrap justify-between gap-x-3 text-slate-300">
           <span>財政</span>
           <span className={stats.treasuryBalance >= 0 ? "text-emerald-400" : "text-rose-400"}>
             {stats.treasuryBalance >= 0 ? "+" : ""}
             {stats.treasuryBalance.toFixed(1)} 兆円
           </span>
         </div>
-        <div className="flex justify-between text-slate-300">
+        <div className="flex flex-wrap justify-between gap-x-3 text-slate-300">
           <span>GDP成長率</span>
           <span className={stats.gdpGrowth >= 0 ? "text-emerald-400" : "text-rose-400"}>
             {stats.gdpGrowth >= 0 ? "+" : ""}
             {stats.gdpGrowth.toFixed(1)}%
           </span>
         </div>
-        <div className="flex justify-between text-slate-300">
+        <div className="flex flex-wrap justify-between gap-x-3 text-slate-300">
           <span>議席数</span>
           <span className={stats.dietSeats >= majority ? "text-emerald-400" : "text-rose-400"}>
-            {Math.round(stats.dietSeats)} / 465 (過半数 {majority})
+            {Math.round(stats.dietSeats)} / 465(過半数{majority})
           </span>
         </div>
       </div>

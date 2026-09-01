@@ -1,5 +1,6 @@
 import { useGameState, useGameDispatch } from "../../state/GameContext";
 import { EffectPreviewTags } from "./EffectPreviewTag";
+import { ScreenContainer } from "./ScreenContainer";
 import type { EventDef } from "../../types/events";
 
 const ACCENTS = {
@@ -30,7 +31,7 @@ export function EventScreen({ def, kicker, accent }: EventScreenProps) {
   const speaker = node?.speakerLabel;
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 p-6">
+    <ScreenContainer>
       <div className={`border-l-4 pl-3 ${ACCENTS[accent]}`}>
         <p className="text-sm font-semibold uppercase tracking-wide">{kicker}</p>
         <h1 className="text-xl font-bold text-slate-100">{def.title}</h1>
@@ -50,6 +51,6 @@ export function EventScreen({ def, kicker, accent }: EventScreenProps) {
           </button>
         ))}
       </div>
-    </div>
+    </ScreenContainer>
   );
 }

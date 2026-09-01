@@ -15,7 +15,7 @@ export function HobbySelector({ onNavigate }: { onNavigate: (screen: PlayerScree
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
         {privateLifePolicyArea.name}
       </p>
-      {onCooldown && <p className="text-xs text-amber-400">Day {readyAt} まで自由時間を取れません</p>}
+      {onCooldown && <p className="text-sm text-amber-400">Day {readyAt} まで自由時間を取れません</p>}
       <div className="flex flex-col gap-2">
         {privateLifePolicyArea.options.map((option) => (
           <button
