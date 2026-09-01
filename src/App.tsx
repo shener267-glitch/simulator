@@ -13,7 +13,7 @@ function Game() {
 export default function App() {
   return (
     <GameProvider>
-      <div className="min-h-full bg-slate-900">
+      <div className="min-h-full bg-ink text-body antialiased">
         <Game />
       </div>
     </GameProvider>

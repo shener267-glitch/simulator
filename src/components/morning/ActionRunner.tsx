@@ -30,25 +30,27 @@ export function ActionRunner() {
     <ScreenContainer width="narrow">
       <MorningClock />
 
-      <div className="flex items-baseline justify-between gap-3">
-        <h1 className="min-w-0 truncate text-lg font-bold text-slate-100">{action.label}</h1>
-        <span className="shrink-0 text-sm tabular-nums text-slate-500">
+      <div className="flex items-baseline justify-between gap-3 border-b border-line pb-3">
+        <h1 className="min-w-0 truncate text-[1.05rem] font-medium text-body">{action.label}</h1>
+        <span className="figures shrink-0 text-[0.8rem] text-body-muted">
           {formatDuration(active.minutesSpent)}
         </span>
       </div>
 
       {segment && (
-        <div className="flex flex-col gap-4">
-          {segment.speaker && <p className="text-sm font-medium text-sky-400">{segment.speaker}</p>}
+        <div key={shownIndex} className="flex animate-fade-up flex-col gap-4">
+          {segment.speaker && (
+            <p className="text-[0.8rem] font-medium tracking-wider text-brass">{segment.speaker}</p>
+          )}
 
-          <p className="whitespace-pre-line text-[0.95rem] leading-relaxed text-slate-300">{segment.text}</p>
+          <p className="whitespace-pre-line text-[0.95rem] leading-[2] text-body">{segment.text}</p>
 
           {segment.lines && (
             <div className="flex flex-col gap-2">
               {segment.lines.map((line) => (
                 <p
                   key={line}
-                  className="rounded-lg border border-slate-800 bg-slate-800/50 px-3 py-2 text-sm leading-relaxed text-slate-300"
+                  className="rounded-xl border border-line bg-ink-panel px-4 py-3 text-[0.88rem] leading-[1.9] text-body-muted"
                 >
                   {line}
                 </p>
@@ -59,24 +61,24 @@ export function ActionRunner() {
       )}
 
       {active.interrupted && (
-        <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm leading-relaxed text-amber-200">
+        <p className="rounded-xl border border-alert/30 bg-alert/10 px-4 py-3 text-[0.88rem] leading-[1.9] text-alert">
           ——そこで時間になった。
         </p>
       )}
 
       {active.exhausted && !active.interrupted && (
-        <p className="text-sm text-slate-500">これ以上は、いまはない。</p>
+        <p className="text-[0.85rem] text-body-faint">これ以上は、いまはない。</p>
       )}
 
-      <div className="mt-2 flex flex-col gap-2">
+      <div className="mt-1 flex flex-col gap-2.5">
         {canContinue && (
           <button
             type="button"
             onClick={() => dispatch({ type: "CONTINUE_SEGMENT" })}
-            className="min-h-[52px] w-full rounded-xl bg-sky-600 px-4 font-medium text-white hover:bg-sky-500 active:bg-sky-700"
+            className="flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-xl bg-brass px-4 text-[0.95rem] font-medium text-ink transition-colors duration-200 hover:bg-brass/90 active:bg-brass/80"
           >
             続ける
-            <span className="ml-2 text-sm font-normal text-sky-200">
+            <span className="figures text-[0.8rem] font-normal text-ink/70">
               {willBeCutShort ? `残り${visibleRemaining}分で中断` : formatDuration(nextSegment!.minutes)}
             </span>
           </button>
@@ -85,7 +87,7 @@ export function ActionRunner() {
         <button
           type="button"
           onClick={() => dispatch({ type: "STOP_ACTION" })}
-          className="min-h-[52px] w-full rounded-xl border border-slate-700 px-4 font-medium text-slate-200 hover:bg-slate-800 active:bg-slate-900"
+          className="min-h-[52px] w-full rounded-xl border border-line-strong px-4 text-[0.95rem] font-medium text-body-muted transition-colors duration-200 hover:border-brass/40 hover:text-body active:bg-white/5"
         >
           {active.interrupted ? "わかった" : active.exhausted ? "戻る" : "やめる"}
         </button>

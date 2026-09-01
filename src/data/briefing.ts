@@ -22,14 +22,47 @@ export const BRIEFING_APPOINTMENT: Appointment = {
 
 export const MORNING_DATE_LABEL = "6月6日(土)";
 
-export const WAKE_SCENE = {
-  title: "六月六日 土曜日",
-  lines: [
-    "総理大臣官邸に隣接する公邸。慣れない天井が視界に入る。",
-    "昨日、首班指名を受けた。皇居での親任式、内閣発足、記者会見、初閣議。すべてが終わったのは日付が変わる頃だった。",
-    "寝室のカーテンの隙間から、もう明るい光が差している。",
-  ],
-};
+/** 起床シーンで一度だけ出す、映画のタイトルカード風の日付。 */
+export const MORNING_DATE_STAMP = "2026.06.06 SAT";
+
+/**
+ * 起床シーンは一画面ずつ送る短いカットの連なりにする（本セッションでの決定）。
+ * 一文字ずつの文字送りはこの場面だけで使い、ニュース・会話・メニューでは使わない。
+ *
+ * 情報を与えるカットは置かない。通知は「溜まっている」ことだけを見せ、中身は
+ * 見せない — 情報は時間を使って取りにいくもの、という設計を崩さないため。
+ */
+export type WakeBeat =
+  | { kind: "clock" }
+  | { kind: "line"; lines: string[] }
+  | { kind: "condition" }
+  | { kind: "notification"; lines: string[]; apps: string[] };
+
+export const WAKE_BEATS: WakeBeat[] = [
+  { kind: "clock" },
+  { kind: "line", lines: ["2026年6月6日、土曜日。"] },
+  {
+    kind: "line",
+    lines: ["総理大臣官邸に隣接する公邸。", "慣れない天井が視界に入る。"],
+  },
+  {
+    kind: "line",
+    lines: ["目が覚めた。", "寝室のカーテンの隙間から、もう明るい光が差している。"],
+  },
+  {
+    kind: "line",
+    lines: [
+      "昨日、首班指名を受けた。",
+      "皇居での親任式、内閣発足、記者会見、初閣議。すべてが終わったのは日付が変わる頃だった。",
+    ],
+  },
+  { kind: "condition" },
+  {
+    kind: "notification",
+    lines: ["枕元のスマートフォンに、通知が溜まっている。", "まだ、見ない。"],
+    apps: ["ニュース", "メッセージ", "メール"],
+  },
+];
 
 /** 沢渡が読み上げる本日の予定。v0.1では提示のみで、中身は実行しない。 */
 export const TODAY_SCHEDULE: { time: string; label: string }[] = [

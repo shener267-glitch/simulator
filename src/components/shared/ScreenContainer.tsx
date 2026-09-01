@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 
 const WIDTHS = {
-  wide: "max-w-3xl",
-  normal: "max-w-2xl",
-  narrow: "max-w-xl",
+  wide: "max-w-lg",
+  normal: "max-w-[28rem]",
+  narrow: "max-w-[27rem]",
 } as const;
 
 interface ScreenContainerProps {
@@ -14,15 +14,15 @@ interface ScreenContainerProps {
 }
 
 /**
- * Shared root wrapper for every screen: tighter padding on phones (where 24px
- * of side padding eats an eighth of the width) and the iOS home-indicator
- * inset, unless the screen pins its own footer to the bottom edge.
+ * Shared root wrapper for every screen. The game is built for a phone held
+ * upright, so the column stays near phone width even on a desktop rather than
+ * stretching into something that reads as a web page.
  */
 export function ScreenContainer({ children, width = "normal", flushBottom = false }: ScreenContainerProps) {
-  const bottomPadding = flushBottom ? "" : "pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-6";
+  const bottomPadding = flushBottom ? "" : "pb-[calc(2rem+env(safe-area-inset-bottom))]";
 
   return (
-    <div className={`mx-auto flex ${WIDTHS[width]} flex-col gap-4 px-4 pt-5 sm:px-6 sm:pt-6 ${bottomPadding}`}>
+    <div className={`mx-auto flex ${WIDTHS[width]} animate-fade-in flex-col gap-5 px-5 pt-5 ${bottomPadding}`}>
       {children}
     </div>
   );

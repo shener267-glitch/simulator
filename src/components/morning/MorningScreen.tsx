@@ -20,10 +20,15 @@ export function MorningScreen() {
       <ScreenContainer width="narrow">
         <MorningClock />
 
-        <div className="rounded-xl border border-slate-800 bg-slate-800/40 p-4 text-[0.95rem] leading-relaxed text-slate-300">
-          {describeCondition(state.condition).map((line) => (
-            <p key={line}>{line}</p>
-          ))}
+        <div className="rounded-2xl border border-line bg-ink-panel px-5 py-4">
+          <p className="font-figure text-[0.6rem] font-medium tracking-label text-brass">CONDITION</p>
+          <div className="mt-3 flex flex-col gap-2">
+            {describeCondition(state.condition).map((line) => (
+              <p key={line} className="text-[0.9rem] leading-[1.9] text-body-muted">
+                {line}
+              </p>
+            ))}
+          </div>
         </div>
 
         <ActionList />

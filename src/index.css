@@ -14,8 +14,46 @@ html {
 }
 
 body {
-  background-color: #0f172a;
-  color: #e2e8f0;
-  /* Kill the rubber-band bounce so the sticky action bar stays put. */
+  background-color: #0b0d12;
+  color: #f2f3f5;
+  font-family: "Noto Sans JP", -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Kill the rubber-band bounce so the sticky header stays put. */
   overscroll-behavior-y: none;
+}
+
+/* Japanese needs more leading than the Tailwind defaults give it. */
+@layer base {
+  p {
+    line-height: 1.9;
+  }
+}
+
+@layer utilities {
+  /* Figures that must not jitter as the clock advances. */
+  .figures {
+    font-feature-settings: "tnum" 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Full-bleed tap targets in the opening should not flash grey on iOS. */
+  .tap-quiet {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* The morning's light, barely there, behind the opening. */
+  .dawn-vignette {
+    background-image: radial-gradient(120% 80% at 50% 0%, rgba(200, 169, 107, 0.07), transparent 60%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
