@@ -1,37 +1,30 @@
-import { createContext, useContext, useReducer, type ReactNode } from "react";
-import { gameReducer, type GameAction } from "./gameReducer";
-import { createNewGame } from "./initialState";
-import { loadGame } from "./persistence";
-import { useAutosave } from "../hooks/useAutosave";
+import { createContext, useContext, useReducer, type Dispatch, type ReactNode } from "react";
 import type { GameState } from "../types/game";
+import { gameReducer, type GameAction } from "./gameReducer";
+import { createInitialState } from "./initialState";
+import { loadGame } from "./persistence";
 
-const GameStateContext = createContext<GameState | null>(null);
-const GameDispatchContext = createContext<((action: GameAction) => void) | null>(null);
-
-function init(): GameState {
-  return loadGame() ?? createNewGame();
-}
+const StateContext = createContext<GameState | null>(null);
+const DispatchContext = createContext<Dispatch<GameAction> | null>(null);
 
 export function GameProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(gameReducer, undefined, init);
-
-  useAutosave(state);
+  const [state, dispatch] = useReducer(gameReducer, null, () => loadGame() ?? createInitialState());
 
   return (
-    <GameStateContext.Provider value={state}>
-      <GameDispatchContext.Provider value={dispatch}>{children}</GameDispatchContext.Provider>
-    </GameStateContext.Provider>
+    <StateContext.Provider value={state}>
+      <DispatchContext.Provider value={dispatch}>{children}</DispatchContext.Provider>
+    </StateContext.Provider>
   );
 }
 
 export function useGameState(): GameState {
-  const ctx = useContext(GameStateContext);
-  if (!ctx) throw new Error("useGameState must be used within a GameProvider");
-  return ctx;
+  const state = useContext(StateContext);
+  if (!state) throw new Error("useGameState must be used inside GameProvider");
+  return state;
 }
 
-export function useGameDispatch(): (action: GameAction) => void {
-  const ctx = useContext(GameDispatchContext);
-  if (!ctx) throw new Error("useGameDispatch must be used within a GameProvider");
-  return ctx;
+export function useGameDispatch(): Dispatch<GameAction> {
+  const dispatch = useContext(DispatchContext);
+  if (!dispatch) throw new Error("useGameDispatch must be used inside GameProvider");
+  return dispatch;
 }

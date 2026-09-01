@@ -1,160 +1,153 @@
-import { describe, it, expect } from "vitest";
-import { gameReducer, createGameReducer } from "../../src/state/gameReducer";
-import { createNewGame } from "../../src/state/initialState";
-import { policyAreas, eventDefs } from "../../src/data/registry";
-import type { GameState } from "../../src/types/game";
+import { describe, expect, it } from "vitest";
+import { gameReducer } from "../../src/state/gameReducer";
+import { createInitialState } from "../../src/state/initialState";
+import { ACTIONS } from "../../src/data/actions";
+import { awake, playThrough, run, totalLogged } from "../testUtils";
 
-describe("gameReducer", () => {
-  it("NEW_GAME returns a fresh playing state at day 0", () => {
-    const state = gameReducer(createNewGame(), { type: "NEW_GAME" });
-    expect(state.status).toBe("playing");
-    expect(state.date.dayIndex).toBe(0);
-  });
+describe("waking up", () => {
+  it("opens on the 05:00 wake-up and costs no time", () => {
+    const state = createInitialState();
+    expect(state.clock).toBe(0);
+    expect(state.activeAppointmentId).toBe("wake");
 
-  it("ADVANCE_DAY moves the calendar forward by one day", () => {
-    const state = createNewGame();
-    const next = gameReducer(state, { type: "ADVANCE_DAY" });
-    expect(next.date.dayIndex).toBe(1);
-  });
-
-  it("ADVANCE_DAY is a no-op while an event is blocking", () => {
-    const state = { ...createNewGame(), activeEvent: { eventId: "x", dayIndex: 0 } };
-    const next = gameReducer(state, { type: "ADVANCE_DAY" });
-    expect(next).toBe(state);
-  });
-
-  it("SELECT_POLICY applies the option's effect and advances one day", () => {
-    const state = createNewGame();
-    const area = policyAreas[0];
-    const option = area.options[0];
-    const next = gameReducer(state, { type: "SELECT_POLICY", areaId: area.id, optionId: option.id });
-
-    expect(next.date.dayIndex).toBe(1);
-    const expectedDelta = option.effect.deltas.find((d) => d.stat === "approvalRating")?.delta ?? 0;
-    // passive drift may nudge approval slightly toward 50 after the choice, so
-    // just assert the choice's own direction was applied rather than an exact value.
-    if (expectedDelta !== 0) {
-      const diff = next.stats.approvalRating - state.stats.approvalRating;
-      expect(Math.sign(diff)).toBe(Math.sign(expectedDelta));
-    }
-  });
-
-  it("SELECT_POLICY is a no-op once the area is on cooldown", () => {
-    const state = createNewGame();
-    const area = policyAreas[0];
-    const once = gameReducer(state, { type: "SELECT_POLICY", areaId: area.id, optionId: area.options[0].id });
-    const twice = gameReducer(once, {
-      type: "SELECT_POLICY",
-      areaId: area.id,
-      optionId: area.options[1].id,
-    });
-    expect(twice.date.dayIndex).toBe(once.date.dayIndex);
-  });
-
-  it("RESOLVE_EVENT_CHOICE applies a flat-choice event and clears activeEvent", () => {
-    const state = {
-      ...createNewGame(),
-      activeEvent: { eventId: "cabinet_budget", dayIndex: 7 },
-    };
-    const next = gameReducer(state, { type: "RESOLVE_EVENT_CHOICE", choiceId: "prioritize_growth" });
-    expect(next.activeEvent).toBeNull();
-    expect(next.stats.gdpGrowth).toBeGreaterThan(state.stats.gdpGrowth);
-  });
-
-  it("RESOLVE_EVENT_CHOICE advances through a dialogue tree without clearing activeEvent until the leaf", () => {
-    const state = {
-      ...createNewGame(),
-      activeEvent: { eventId: "diet_questioning_economy", dayIndex: 42, currentDialogueNodeId: "q1" },
-    };
-    const afterFirst = gameReducer(state, { type: "RESOLVE_EVENT_CHOICE", choiceId: "defend_policy" });
-    expect(afterFirst.activeEvent).not.toBeNull();
-    expect(afterFirst.activeEvent?.currentDialogueNodeId).toBe("q2");
-
-    const afterSecond = gameReducer(afterFirst, {
-      type: "RESOLVE_EVENT_CHOICE",
-      choiceId: "pledge_reform",
-    });
-    expect(afterSecond.activeEvent).toBeNull();
-  });
-
-  it("RESIGN sets game-over status immediately", () => {
-    const state = createNewGame();
-    const next = gameReducer(state, { type: "RESIGN" });
-    expect(next.status).toBe("gameover_resignation");
-  });
-
-  it("RESHUFFLE_CABINET boosts faction loyalty and resets pressure", () => {
-    const base = createNewGame();
-    const factionId = Object.keys(base.factions)[0];
-    const state = {
-      ...base,
-      factions: {
-        ...base.factions,
-        [factionId]: { ...base.factions[factionId], loyalty: 35, reshufflePressure: 40 },
-      },
-    };
-    const next = gameReducer(state, { type: "RESHUFFLE_CABINET" });
-    // Loyalty is raised enough (35 -> 45) to clear the <40 threshold that
-    // would otherwise let the following day's passive drift re-add pressure.
-    expect(next.factions[factionId].loyalty).toBeGreaterThan(35);
-    expect(next.factions[factionId].reshufflePressure).toBe(0);
-  });
-
-  it("plays out a scripted multi-day sequence: advance, hit cabinet event, resolve, advance again", () => {
-    // rng pinned to 1 so weightedPick always resolves to the *last* eligible
-    // random candidate for days 1-7, which happens to be a non-blocking
-    // flavor event (see privateLifeEvents.ts ordering) — this keeps the
-    // fixed cabinet_budget trigger on day 7 as the first blocking event.
-    const deterministicReducer = createGameReducer(() => 1);
-    let state: GameState = createNewGame();
-    for (let i = 0; i < 7; i++) {
-      state = deterministicReducer(state, { type: "ADVANCE_DAY" });
-    }
-    expect(state.date.dayIndex).toBe(7);
-    expect(state.activeEvent).not.toBeNull();
-
-    const def = state.activeEvent!.eventId;
-    expect(def).toBe("cabinet_budget");
-
-    state = deterministicReducer(state, { type: "RESOLVE_EVENT_CHOICE", choiceId: "balanced_budget" });
-    expect(state.activeEvent).toBeNull();
-
-    state = deterministicReducer(state, { type: "ADVANCE_DAY" });
-    expect(state.date.dayIndex).toBe(8);
-  });
-
-  it("a bounded fast-forward simulation eventually reaches a non-playing status without crashing", () => {
-    // Simple deterministic PRNG (mulberry32) so this smoke test is reproducible.
-    let seed = 42;
-    const rng = () => {
-      seed |= 0;
-      seed = (seed + 0x6d2b79f5) | 0;
-      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-    const reducer = createGameReducer(rng);
-
-    let state: GameState = createNewGame();
-    let iterations = 0;
-    const MAX_ITERATIONS = 500;
-    while (state.status === "playing" && iterations < MAX_ITERATIONS) {
-      state = state.activeEvent
-        ? resolveFirstChoice(state, reducer)
-        : reducer(state, { type: "FAST_FORWARD" });
-      iterations += 1;
-    }
-    expect(state.date.dayIndex).toBeGreaterThan(0);
-    expect(iterations).toBeLessThan(MAX_ITERATIONS);
+    const after = gameReducer(state, { type: "RESOLVE_APPOINTMENT" });
+    expect(after.clock).toBe(0);
+    expect(after.activeAppointmentId).toBeNull();
+    expect(after.log).toHaveLength(0);
   });
 });
 
-function resolveFirstChoice(state: GameState, reducer: typeof gameReducer): GameState {
-  const active = state.activeEvent;
-  if (!active) return state;
-  const def = eventDefs[active.eventId];
-  const choiceId = def.dialogue
-    ? def.dialogue.nodes[active.currentDialogueNodeId ?? def.dialogue.rootNodeId].choices[0].id
-    : def.choices![0].id;
-  return reducer(state, { type: "RESOLVE_EVENT_CHOICE", choiceId });
-}
+describe("spending time on an action", () => {
+  it("consumes the first segment as soon as the action starts", () => {
+    const after = gameReducer(awake(), { type: "START_ACTION", actionId: "news" });
+    expect(after.clock).toBe(15);
+    expect(after.activeAction?.minutesSpent).toBe(15);
+  });
+
+  it("charges only the segments actually consumed when the player stops early", () => {
+    const after = run(
+      awake(),
+      { type: "START_ACTION", actionId: "documents" },
+      { type: "CONTINUE_SEGMENT" },
+      { type: "STOP_ACTION" },
+    );
+
+    expect(after.clock).toBe(20);
+    expect(after.log).toEqual([{ label: "資料を読む", minutes: 20, startedAt: 0 }]);
+  });
+
+  it("picks a half-finished action back up where it was left", () => {
+    const stopped = run(
+      awake(),
+      { type: "START_ACTION", actionId: "documents" },
+      { type: "CONTINUE_SEGMENT" },
+      { type: "STOP_ACTION" },
+    );
+    const resumed = gameReducer(stopped, { type: "START_ACTION", actionId: "documents" });
+
+    expect(resumed.clock).toBe(30);
+    expect(resumed.activeAction?.exhausted).toBe(true);
+  });
+
+  it("uses up an ordinary action but lets a repeatable one come round again", () => {
+    const usedUp = playThrough(awake(), "documents");
+    expect(usedUp.spentActions).toContain("documents");
+    expect(gameReducer(usedUp, { type: "START_ACTION", actionId: "documents" }).activeAction).toBeNull();
+
+    const twice = playThrough(playThrough(awake(), "idle"), "idle");
+    expect(twice.clock).toBe(30);
+    expect(twice.spentActions).not.toContain("idle");
+  });
+});
+
+describe("interruptions", () => {
+  it("cuts an action short at the interruption and charges only the minutes that were left", () => {
+    let state = playThrough(awake(), "documents"); // 30分 → 05:30
+    state = playThrough(state, "breakfast"); // 20分 → 05:50
+    state = playThrough(state, "idle"); // 15分 → 06:05
+    expect(state.clock).toBe(65);
+
+    // 15分のニュースを始めるが、06:10の連絡まで5分しかない。
+    state = gameReducer(state, { type: "START_ACTION", actionId: "news" });
+    expect(state.clock).toBe(70);
+    expect(state.activeAction?.interrupted).toBe(true);
+    expect(state.activeAction?.minutesSpent).toBe(5);
+
+    state = gameReducer(state, { type: "STOP_ACTION" });
+    expect(state.log[state.log.length - 1]).toEqual({ label: "ニュースを見る", minutes: 5, startedAt: 65 });
+    // 読み切っていないので、あとでニュースの続きから読める。
+    expect(state.actionProgress.news).toBe(0);
+  });
+
+  it("brings the briefing forward from 07:00 to 06:30 when the call comes in", () => {
+    const before = awake();
+    expect(before.appointments.find((a) => a.id === "briefing")?.at).toBe(120);
+
+    let state = playThrough(before, "news"); // 60分 → 06:00
+    state = playThrough(state, "sns"); // 06:10の連絡で頭打ち
+    expect(state.clock).toBe(70);
+    expect(state.activeEventId).toBe("funding-report");
+    expect(state.appointments.find((a) => a.id === "briefing")?.at).toBe(90);
+    expect(state.highlights.some((line) => line.includes("06:30"))).toBe(true);
+  });
+
+  it("runs the briefing for its full half hour once the player sits down for it", () => {
+    let state = playThrough(playThrough(awake(), "news"), "sns");
+    state = gameReducer(state, { type: "DISMISS_EVENT" });
+    expect(state.clock).toBe(70);
+
+    state = playThrough(state, "idle"); // 15分 → 06:25
+    state = playThrough(state, "idle"); // 06:30で頭打ち
+    expect(state.clock).toBe(90);
+    expect(state.activeAppointmentId).toBe("briefing");
+
+    state = gameReducer(state, { type: "RESOLVE_APPOINTMENT" });
+    expect(state.clock).toBe(120);
+    expect(state.highlights).toContain("沢渡と篠塚から本日の日程の説明を受けた。");
+  });
+});
+
+describe("the whole morning", () => {
+  function playUntilReview() {
+    let state = awake();
+    for (let guard = 0; guard < 200 && state.phase === "morning"; guard += 1) {
+      if (state.activeEventId) {
+        state = gameReducer(state, { type: "DISMISS_EVENT" });
+        continue;
+      }
+      if (state.activeAppointmentId) {
+        state = gameReducer(state, { type: "RESOLVE_APPOINTMENT" });
+        continue;
+      }
+      const available = ACTIONS.find((action) => !state.spentActions.includes(action.id));
+      state = playThrough(state, available!.id);
+    }
+    return state;
+  }
+
+  it("ends at 08:00 with every minute accounted for in the log", () => {
+    const state = playUntilReview();
+
+    expect(state.phase).toBe("review");
+    expect(state.clock).toBe(180);
+    expect(totalLogged(state)).toBe(180);
+  });
+
+  it("always gets the call and the briefing in, however the time was spent", () => {
+    const state = playUntilReview();
+
+    expect(state.events.every((event) => event.fired)).toBe(true);
+    expect(state.appointments.every((appointment) => appointment.resolved)).toBe(true);
+    expect(state.log.some((entry) => entry.label.includes("ブリーフィング"))).toBe(true);
+  });
+
+  it("puts the morning back to 05:00 when it is restarted", () => {
+    const restarted = gameReducer(playUntilReview(), { type: "RESTART_MORNING" });
+
+    expect(restarted.clock).toBe(0);
+    expect(restarted.phase).toBe("morning");
+    expect(restarted.log).toHaveLength(0);
+    expect(restarted.highlights).toHaveLength(0);
+    expect(restarted.activeAppointmentId).toBe("wake");
+  });
+});

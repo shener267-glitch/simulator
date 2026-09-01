@@ -1,66 +1,29 @@
-import type { GameState, FactionState, CountryRelationState, FamilyMemberState } from "../types/game";
-import { createStartDate } from "../engine/calendar";
-import { factionDefs, countryDefs, familyDefs, INITIAL_DIET_SEATS } from "../data/registry";
+import type { GameState } from "../types/game";
+import { BRIEFING_APPOINTMENT, WAKE_APPOINTMENT } from "../data/briefing";
+import { MORNING_EVENT } from "../data/morningEvent";
+import { PLAYER_DEFAULT_NAME } from "../data/characters";
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
-export function createNewGame(): GameState {
-  const factions: Record<string, FactionState> = {};
-  for (const def of factionDefs) {
-    factions[def.id] = {
-      id: def.id,
-      name: def.name,
-      leaderName: def.leaderName,
-      personality: def.personality,
-      seatShare: def.initialSeatShare,
-      loyalty: def.initialLoyalty,
-      reshufflePressure: 0,
-    };
-  }
-
-  const countryRelations: Record<string, CountryRelationState> = {};
-  for (const def of countryDefs) {
-    countryRelations[def.id] = {
-      countryId: def.id,
-      name: def.name,
-      relationScore: def.initialRelation,
-      lastMetDayIndex: null,
-    };
-  }
-
-  const family: FamilyMemberState[] = familyDefs.map((def) => ({
-    id: def.id,
-    name: def.name,
-    relation: def.relation,
-    relationship: def.initialRelationship,
-  }));
-
+/**
+ * 6/6 05:00。前夜は首班指名から初閣議までが日付をまたいで終わったため、
+ * 睡眠は足りていない。数値は内部だけで持ち、画面には文章で出す。
+ */
+export function createInitialState(player?: GameState["player"]): GameState {
   return {
     saveVersion: SAVE_VERSION,
-    date: createStartDate(),
-    term: {
-      termLengthDays: 1460,
-      dissolutionThresholdApproval: 20,
-      scandalCollapseThreshold: 70,
-    },
-    stats: {
-      approvalRating: 55,
-      treasuryBalance: 0,
-      gdpGrowth: 1.0,
-      partyUnity: 60,
-      dietSeats: INITIAL_DIET_SEATS,
-      health: 85,
-      stress: 20,
-      scandalRisk: 5,
-    },
-    factions,
-    countryRelations,
-    family,
-    flags: {},
-    history: [{ dayIndex: 0, text: "組閣が完了し、新内閣が発足した。", kind: "system" }],
-    policyCooldowns: {},
-    eventCooldowns: {},
-    activeEvent: null,
-    status: "playing",
+    clock: 0,
+    phase: "morning",
+    player: player ?? { ...PLAYER_DEFAULT_NAME },
+    condition: { fatigue: 55, hunger: 45 },
+    appointments: [{ ...WAKE_APPOINTMENT }, { ...BRIEFING_APPOINTMENT }],
+    events: [{ ...MORNING_EVENT }],
+    log: [],
+    highlights: [],
+    spentActions: [],
+    actionProgress: {},
+    activeAction: null,
+    activeAppointmentId: WAKE_APPOINTMENT.id,
+    activeEventId: null,
   };
 }

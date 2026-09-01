@@ -1,83 +1,89 @@
-import type { ScheduledEventInstance } from "./events";
+import type { Minutes } from "./clock";
 
-export interface DateCursor {
-  year: number;
-  month: number;
-  day: number;
-  dayIndex: number;
+/**
+ * Tracked internally but never rendered as a number — the UI only ever shows
+ * the prose from engine/condition.ts (設計書24章で健康システムは未決定のため、
+ * v0.1では表示方法だけを確定させている).
+ */
+export interface Condition {
+  /** 0 = 万全, 100 = 限界. */
+  fatigue: number;
+  /** 0 = 満腹, 100 = 空腹. */
+  hunger: number;
 }
 
-export interface TermInfo {
-  termLengthDays: number;
-  dissolutionThresholdApproval: number;
-  scandalCollapseThreshold: number;
-}
-
-export interface GlobalStats {
-  approvalRating: number;
-  treasuryBalance: number;
-  gdpGrowth: number;
-  partyUnity: number;
-  dietSeats: number;
-  health: number;
-  stress: number;
-  scandalRisk: number;
-}
-
-export interface CountryRelationState {
-  countryId: string;
-  name: string;
-  relationScore: number;
-  lastMetDayIndex: number | null;
-}
-
-export interface FamilyMemberState {
+/** A fixed point in the morning the player does not control. */
+export interface Appointment {
   id: string;
-  name: string;
-  relation: string;
-  relationship: number;
+  label: string;
+  /** Offset from 05:00. Events may pull this earlier. */
+  at: Minutes;
+  minutes: Minutes;
+  resolved: boolean;
+  /** Recorded in the morning's highlights once attended. */
+  highlight?: string;
 }
 
-export interface FactionState {
+/** Something that arrives on its own at a set time (設計書17章). */
+export interface TimedEvent {
   id: string;
-  name: string;
-  leaderName: string;
-  personality: "hawkish" | "dovish" | "pragmatic" | "reformist";
-  seatShare: number;
-  loyalty: number;
-  reshufflePressure: number;
+  at: Minutes;
+  title: string;
+  /** Who got in touch. */
+  from: string;
+  body: string[];
+  /** Pulls an appointment to a new time when the event fires. */
+  movesAppointment?: {
+    appointmentId: string;
+    to: Minutes;
+    note: string;
+  };
+  highlight: string;
+  fired: boolean;
 }
 
-export interface HistoryLogEntry {
-  dayIndex: number;
-  text: string;
-  kind: "news" | "scandal" | "achievement" | "system";
+export interface ActiveAction {
+  actionId: string;
+  /** Index of the segment that runs next. */
+  segmentIndex: number;
+  minutesSpent: Minutes;
+  startedAt: Minutes;
+  /** Set when an appointment or event cut the action short. */
+  interrupted: boolean;
+  /** Set when every segment has been consumed. */
+  exhausted: boolean;
 }
 
-export type GameStatus =
-  | "playing"
-  | "gameover_resignation"
-  | "gameover_dissolution"
-  | "gameover_scandal"
-  | "termend";
-
-export interface PolicyCooldowns {
-  [policyAreaId: string]: number; // dayIndex when area becomes available again
+/** What the player did and how long it took — the morning review reads this. */
+export interface LogEntry {
+  label: string;
+  minutes: Minutes;
+  startedAt: Minutes;
 }
+
+export type Phase = "morning" | "review";
 
 export interface GameState {
   saveVersion: number;
-  date: DateCursor;
-  term: TermInfo;
-  stats: GlobalStats;
-  factions: Record<string, FactionState>;
-  countryRelations: Record<string, CountryRelationState>;
-  family: FamilyMemberState[];
-  flags: Record<string, boolean>;
-  history: HistoryLogEntry[];
-  policyCooldowns: PolicyCooldowns;
-  eventCooldowns: Record<string, number>; // eventId -> dayIndex when re-eligible
-  activeEvent: ScheduledEventInstance | null;
-  status: GameStatus;
-  gameOverReason?: string;
+  clock: Minutes;
+  phase: Phase;
+  player: {
+    familyName: string;
+    givenName: string;
+  };
+  condition: Condition;
+  appointments: Appointment[];
+  events: TimedEvent[];
+  log: LogEntry[];
+  /** Notable moments, in the order they happened. */
+  highlights: string[];
+  /** Actions whose segments have all been used up. */
+  spentActions: string[];
+  /** How far into each action the player has read, so returning to it resumes. */
+  actionProgress: Record<string, number>;
+  activeAction: ActiveAction | null;
+  /** Appointment being played out right now. */
+  activeAppointmentId: string | null;
+  /** Event notice currently on screen. */
+  activeEventId: string | null;
 }

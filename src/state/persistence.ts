@@ -1,7 +1,7 @@
 import type { GameState } from "../types/game";
 import { SAVE_VERSION } from "./initialState";
 
-const STORAGE_KEY = "pm-sim:save:v1";
+const STORAGE_KEY = "pm-sim:save:v2";
 
 export function saveGame(state: GameState): void {
   try {

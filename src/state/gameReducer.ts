@@ -1,170 +1,182 @@
-import type { GameState } from "../types/game";
-import type { PolicyArea } from "../types/policy";
-import { applyEffects } from "../engine/effects";
-import { advanceOneDay, type DayStepDeps } from "../engine/dayStep";
-import { fastForwardToNextEvent } from "../engine/fastForward";
-import { createNewGame } from "./initialState";
-import { policyAreas, privateLifePolicyArea, eventDefs, eventTriggers } from "../data/registry";
+import { MORNING_LENGTH } from "../types/clock";
+import type { Action as FreeAction } from "../types/action";
+import type { ActiveAction, GameState } from "../types/game";
+import { interruptionGuard } from "../engine/actions";
+import { isMorningOver } from "../engine/clock";
+import { applyElapsed, clampCondition } from "../engine/condition";
+import { dueAppointment, dueEvent, moveAppointment } from "../engine/schedule";
+import { findAction } from "../data/actions";
+import { createInitialState } from "./initialState";
 
 export type GameAction =
-  | { type: "NEW_GAME" }
-  | { type: "ADVANCE_DAY" }
-  | { type: "FAST_FORWARD" }
-  | { type: "SELECT_POLICY"; areaId: string; optionId: string }
-  | { type: "SELECT_HOBBY"; optionId: string }
-  | { type: "RESOLVE_EVENT_CHOICE"; choiceId: string }
-  | { type: "RESHUFFLE_CABINET" }
-  | { type: "RESIGN" }
-  | { type: "LOAD_GAME"; state: GameState };
+  | { type: "RESOLVE_APPOINTMENT" }
+  | { type: "DISMISS_EVENT" }
+  | { type: "START_ACTION"; actionId: string }
+  | { type: "CONTINUE_SEGMENT" }
+  | { type: "STOP_ACTION" }
+  | { type: "RESTART_MORNING" }
+  | { type: "NEW_GAME" };
 
-const RESHUFFLE_COOLDOWN_ID = "cabinet_reshuffle";
-const RESHUFFLE_COOLDOWN_DAYS = 45;
-
-function findPolicyArea(areaId: string): PolicyArea | undefined {
-  if (areaId === privateLifePolicyArea.id) return privateLifePolicyArea;
-  return policyAreas.find((a) => a.id === areaId);
-}
-
-function applyPolicyChoice(state: GameState, areaId: string, optionId: string): GameState {
-  const area = findPolicyArea(areaId);
-  const option = area?.options.find((o) => o.id === optionId);
-  if (!area || !option) return state;
-  if (state.policyCooldowns[areaId] !== undefined && state.date.dayIndex < state.policyCooldowns[areaId]) {
-    return state;
+/**
+ * Run after every clock change: something that arrives on its own takes
+ * precedence over an appointment, because it may pull that appointment
+ * earlier. Only when nothing is waiting does the morning get to end.
+ */
+function checkTriggers(state: GameState): GameState {
+  const event = dueEvent(state, state.clock);
+  if (event) {
+    const appointments = event.movesAppointment
+      ? moveAppointment(state.appointments, event.movesAppointment.appointmentId, event.movesAppointment.to)
+      : state.appointments;
+    return {
+      ...state,
+      appointments,
+      events: state.events.map((candidate) =>
+        candidate.id === event.id ? { ...candidate, fired: true } : candidate,
+      ),
+      highlights: [...state.highlights, event.highlight],
+      activeEventId: event.id,
+    };
   }
 
-  let next = applyEffects(state, option.effect);
-
-  if (option.factionReactions) {
-    const factions = { ...next.factions };
-    for (const [factionId, delta] of Object.entries(option.factionReactions)) {
-      const faction = factions[factionId];
-      if (faction) {
-        factions[factionId] = { ...faction, loyalty: Math.max(0, Math.min(100, faction.loyalty + delta)) };
-      }
-    }
-    next = { ...next, factions };
+  const appointment = dueAppointment(state, state.clock);
+  if (appointment) {
+    return { ...state, activeAppointmentId: appointment.id };
   }
 
-  next = {
-    ...next,
-    policyCooldowns: { ...next.policyCooldowns, [areaId]: next.date.dayIndex + area.cooldownDays },
-  };
+  if (isMorningOver(state.clock)) {
+    return { ...state, phase: "review" };
+  }
 
-  return next;
+  return state;
 }
 
 /**
- * Factory so tests can inject a deterministic rng; production code uses the
- * `gameReducer` export below, which defaults to Math.random.
+ * Consume one segment. If it does not fit before the next interruption, the
+ * player gets the minutes that were actually left and the action is cut short
+ * (設計書13章・19章).
  */
-export function createGameReducer(rng: () => number = Math.random) {
-  const dayStepDeps: DayStepDeps = { triggers: eventTriggers, eventDefs, rng };
-  return function gameReducer(state: GameState, action: GameAction): GameState {
-    return runAction(state, action, dayStepDeps);
+function runSegment(state: GameState, action: FreeAction, active: ActiveAction): GameState {
+  const segment = action.segments[active.segmentIndex];
+  if (!segment) return state;
+
+  const remaining = interruptionGuard(state) - state.clock;
+  const fits = segment.minutes <= remaining;
+  const spent = fits ? segment.minutes : Math.max(0, remaining);
+
+  const afterElapsed = applyElapsed(state.condition, spent);
+  const condition = fits
+    ? clampCondition({
+        fatigue: afterElapsed.fatigue + (action.perSegment?.fatigue ?? 0),
+        hunger: afterElapsed.hunger + (action.perSegment?.hunger ?? 0),
+      })
+    : afterElapsed;
+
+  const segmentIndex = fits ? active.segmentIndex + 1 : active.segmentIndex;
+
+  return {
+    ...state,
+    clock: state.clock + spent,
+    condition,
+    highlights: fits && segment.highlight ? [...state.highlights, segment.highlight] : state.highlights,
+    activeAction: {
+      ...active,
+      segmentIndex,
+      minutesSpent: active.minutesSpent + spent,
+      interrupted: !fits,
+      exhausted: fits && segmentIndex >= action.segments.length,
+    },
   };
 }
 
-function runAction(state: GameState, action: GameAction, dayStepDeps: DayStepDeps): GameState {
-  switch (action.type) {
+/** Close out the running action: record the time, then see what is waiting. */
+function finishAction(state: GameState): GameState {
+  const active = state.activeAction;
+  if (!active) return state;
+  const action = findAction(active.actionId);
+  if (!action) return { ...state, activeAction: null };
+
+  const spent = active.minutesSpent;
+  const usedUp = active.segmentIndex >= action.segments.length;
+
+  return checkTriggers({
+    ...state,
+    activeAction: null,
+    log: spent > 0 ? [...state.log, { label: action.label, minutes: spent, startedAt: active.startedAt }] : state.log,
+    spentActions:
+      usedUp && !action.repeatable && !state.spentActions.includes(action.id)
+        ? [...state.spentActions, action.id]
+        : state.spentActions,
+    actionProgress: { ...state.actionProgress, [action.id]: active.segmentIndex },
+  });
+}
+
+export function gameReducer(state: GameState, gameAction: GameAction): GameState {
+  switch (gameAction.type) {
+    case "DISMISS_EVENT":
+      return checkTriggers({ ...state, activeEventId: null });
+
+    case "RESOLVE_APPOINTMENT": {
+      const appointment = state.appointments.find((candidate) => candidate.id === state.activeAppointmentId);
+      if (!appointment) return state;
+
+      const clock = Math.min(MORNING_LENGTH, state.clock + appointment.minutes);
+      const spent = clock - state.clock;
+
+      return checkTriggers({
+        ...state,
+        clock,
+        condition: applyElapsed(state.condition, spent),
+        appointments: state.appointments.map((candidate) =>
+          candidate.id === appointment.id ? { ...candidate, resolved: true } : candidate,
+        ),
+        activeAppointmentId: null,
+        log:
+          spent > 0
+            ? [...state.log, { label: appointment.label, minutes: spent, startedAt: state.clock }]
+            : state.log,
+        highlights: appointment.highlight
+          ? [...state.highlights, appointment.highlight]
+          : state.highlights,
+      });
+    }
+
+    case "START_ACTION": {
+      if (state.activeAction || state.activeEventId || state.activeAppointmentId) return state;
+      const action = findAction(gameAction.actionId);
+      if (!action || state.spentActions.includes(action.id)) return state;
+
+      const resumeAt = action.repeatable ? 0 : (state.actionProgress[action.id] ?? 0);
+      if (resumeAt >= action.segments.length) return state;
+
+      return runSegment(state, action, {
+        actionId: action.id,
+        segmentIndex: resumeAt,
+        minutesSpent: 0,
+        startedAt: state.clock,
+        interrupted: false,
+        exhausted: false,
+      });
+    }
+
+    case "CONTINUE_SEGMENT": {
+      const active = state.activeAction;
+      if (!active || active.interrupted || active.exhausted) return state;
+      const action = findAction(active.actionId);
+      if (!action) return state;
+      return runSegment(state, action, active);
+    }
+
+    case "STOP_ACTION":
+      return finishAction(state);
+
+    case "RESTART_MORNING":
+      return createInitialState(state.player);
+
     case "NEW_GAME":
-      return createNewGame();
-
-    case "LOAD_GAME":
-      return action.state;
-
-    case "ADVANCE_DAY": {
-      if (state.activeEvent || state.status !== "playing") return state;
-      return advanceOneDay(state, dayStepDeps);
-    }
-
-    case "FAST_FORWARD": {
-      if (state.activeEvent || state.status !== "playing") return state;
-      return fastForwardToNextEvent(state, dayStepDeps).state;
-    }
-
-    case "SELECT_POLICY": {
-      if (state.activeEvent || state.status !== "playing") return state;
-      const withChoice = applyPolicyChoice(state, action.areaId, action.optionId);
-      if (withChoice === state) return state;
-      return advanceOneDay(withChoice, dayStepDeps);
-    }
-
-    case "SELECT_HOBBY": {
-      if (state.activeEvent || state.status !== "playing") return state;
-      const withChoice = applyPolicyChoice(state, privateLifePolicyArea.id, action.optionId);
-      if (withChoice === state) return state;
-      return advanceOneDay(withChoice, dayStepDeps);
-    }
-
-    case "RESOLVE_EVENT_CHOICE": {
-      if (!state.activeEvent) return state;
-      const def = eventDefs[state.activeEvent.eventId];
-      if (!def) return { ...state, activeEvent: null };
-
-      if (def.dialogue) {
-        const node = def.dialogue.nodes[state.activeEvent.currentDialogueNodeId ?? def.dialogue.rootNodeId];
-        const choice = node?.choices.find((c) => c.id === action.choiceId);
-        if (!choice) return state;
-        let next = applyEffects(state, choice.effect);
-        if (choice.followUpNodeId) {
-          next = {
-            ...next,
-            activeEvent: { ...next.activeEvent!, currentDialogueNodeId: choice.followUpNodeId },
-          };
-        } else {
-          next = { ...next, activeEvent: null };
-        }
-        return next;
-      }
-
-      const choice = def.choices?.find((c) => c.id === action.choiceId);
-      if (!choice) return state;
-      const next = applyEffects(state, choice.effect);
-      return { ...next, activeEvent: null };
-    }
-
-    case "RESHUFFLE_CABINET": {
-      if (state.activeEvent || state.status !== "playing") return state;
-      const readyAt = state.eventCooldowns[RESHUFFLE_COOLDOWN_ID];
-      if (readyAt !== undefined && state.date.dayIndex < readyAt) return state;
-
-      const factions = { ...state.factions };
-      for (const id of Object.keys(factions)) {
-        factions[id] = {
-          ...factions[id],
-          loyalty: Math.min(100, factions[id].loyalty + 10),
-          reshufflePressure: 0,
-        };
-      }
-
-      const withReshuffle = applyEffects(
-        { ...state, factions },
-        {
-          deltas: [{ stat: "approvalRating", delta: -3 }],
-          description: "内閣改造が行われ、党内の引き締めが図られた。",
-        },
-      );
-
-      const next: GameState = {
-        ...withReshuffle,
-        eventCooldowns: {
-          ...withReshuffle.eventCooldowns,
-          [RESHUFFLE_COOLDOWN_ID]: withReshuffle.date.dayIndex + RESHUFFLE_COOLDOWN_DAYS,
-        },
-      };
-
-      return advanceOneDay(next, dayStepDeps);
-    }
-
-    case "RESIGN": {
-      if (state.status !== "playing") return state;
-      return { ...state, status: "gameover_resignation", gameOverReason: "自らの意思で辞任しました。" };
-    }
+      return createInitialState();
 
     default:
       return state;
   }
 }
-
-export const gameReducer = createGameReducer();
