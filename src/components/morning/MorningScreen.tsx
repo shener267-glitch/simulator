@@ -1,5 +1,6 @@
 import { PlaceScreen } from "../place/PlaceScreen";
 import { ActionRunner } from "./ActionRunner";
+import { AppointmentScreen } from "./AppointmentScreen";
 import { BriefingScreen } from "./BriefingScreen";
 import { InterruptNotice } from "./InterruptNotice";
 import { WakeScene } from "./WakeScene";
@@ -12,8 +13,9 @@ function Base({ mode }: { mode: RestingMode }) {
       return <WakeScene />;
     case "action":
       return <ActionRunner />;
+    // ブリーフィングだけは日程表を出すので、専用の画面を持っている。
     case "appointment":
-      return <BriefingScreen />;
+      return mode.appointmentId === "briefing" ? <BriefingScreen /> : <AppointmentScreen />;
     // 「どのくらい？」は現在地の画面に重ねて出す。
     case "duration":
     case "place":

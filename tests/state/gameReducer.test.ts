@@ -4,7 +4,16 @@ import { createInitialState } from "../../src/state/initialState";
 import { durationOptions, remainingToTarget } from "../../src/engine/actions";
 import { actionsAt } from "../../src/engine/places";
 import { findAction } from "../../src/data/actions";
-import { at, awake, currentRun, playThrough, run, totalLogged, withoutCall } from "../testUtils";
+import {
+  at,
+  awake,
+  currentRun,
+  playThrough,
+  resolved,
+  run,
+  totalLogged,
+  withoutCall,
+} from "../testUtils";
 
 describe("waking up", () => {
   it("opens on the 05:00 wake-up and costs no time", () => {
@@ -229,6 +238,47 @@ describe("appointments, which are not negotiable", () => {
     state = gameReducer(state, { type: "RESOLVE_APPOINTMENT" });
     expect(state.clock).toBe(151);
     expect(state.highlights).toContain("沢渡と篠塚から本日の日程の説明を受けた。");
+  });
+});
+
+describe("being taken to the 官邸", () => {
+  it("carries the player across at 07:30 without asking", () => {
+    // 07:25、公邸のリビングにいる。予定は待ってくれない。
+    let state = { ...resolved(withoutCall(at(awake(), "living")), "briefing"), clock: 145 };
+    state = gameReducer(state, { type: "START_ACTION", actionId: "breakfast" });
+    state = gameReducer(state, { type: "STOP_ACTION" });
+
+    expect(state.mode).toMatchObject({ kind: "appointment", appointmentId: "kantei" });
+    expect(state.place).toBe("living");
+
+    state = gameReducer(state, { type: "RESOLVE_APPOINTMENT" });
+    expect(state.clock).toBe(155);
+    expect(state.place).toBe("office");
+    expect(state.highlights).toContain("官邸に入った。");
+  });
+
+  it("gives the 官邸 something to do, and no way to wander back", () => {
+    const here = actionsAt("office").map((action) => action.id);
+    expect(here.length).toBeGreaterThan(0);
+    expect(here).toContain("documents");
+    // 公邸へ歩いて戻る道はプレイヤーには開いていない。
+    expect(gameReducer({ ...awake(), place: "office" }, { type: "MOVE_TO", place: "living" }).place).toBe(
+      "office",
+    );
+  });
+
+  it("finishes the morning on the 官房長官 meeting, exactly at 08:00", () => {
+    let state = {
+      ...resolved(withoutCall(at(awake(), "office")), "briefing", "kantei"),
+      clock: 165,
+    };
+    state = gameReducer(state, { type: "MOVE_TO", place: "secretariat" });
+
+    expect(state.mode).toMatchObject({ kind: "appointment", appointmentId: "chief-meeting" });
+
+    state = gameReducer(state, { type: "RESOLVE_APPOINTMENT" });
+    expect(state.clock).toBe(180);
+    expect(state.phase).toBe("review");
   });
 });
 

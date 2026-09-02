@@ -26,6 +26,16 @@ export function currentRun(state: GameState): SegmentRun | null {
   return runOf(state.mode);
 }
 
+/** 指定の予定を済ませたことにする。あとの時間帯だけを試したいとき用。 */
+export function resolved(state: GameState, ...ids: string[]): GameState {
+  return {
+    ...state,
+    appointments: state.appointments.map((appointment) =>
+      ids.includes(appointment.id) ? { ...appointment, resolved: true } : appointment,
+    ),
+  };
+}
+
 /** 06:10の着信をすでに済ませたことにする。予定に切られる側だけを見たいとき用。 */
 export function withoutCall(state: GameState): GameState {
   return { ...state, interrupts: state.interrupts.map((item) => ({ ...item, fired: true })) };
