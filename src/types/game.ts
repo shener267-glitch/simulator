@@ -1,9 +1,11 @@
 import type { Minutes } from "./clock";
+import type { PlaceId } from "./place";
+import type { Mode } from "./mode";
 
 /**
- * Tracked internally but never rendered as a number — the UI only ever shows
- * the prose from engine/condition.ts (設計書24章で健康システムは未決定のため、
- * v0.1では表示方法だけを確定させている).
+ * Tracked internally but never rendered as a number — the UI shows the prose
+ * from engine/condition.ts and a five-cell meter, and neither ever prints a
+ * digit（設計書24章・30章）.
  */
 export interface Condition {
   /** 0 = 万全, 100 = 限界. */
@@ -12,7 +14,10 @@ export interface Condition {
   hunger: number;
 }
 
-/** A fixed point in the morning the player does not control. */
+/**
+ * A fixed point in the morning the player does not control — HARD. Crossing
+ * one cuts a segment short and charges only the minutes that were really left.
+ */
 export interface Appointment {
   id: string;
   label: string;
@@ -20,6 +25,13 @@ export interface Appointment {
   at: Minutes;
   minutes: Minutes;
   resolved: boolean;
+  /** Where attending it leaves the player — 07:30の官邸入りがこれ。 */
+  movesTo?: PlaceId;
+  /**
+   * 予定表に載っているか。false のものは visibleFreeMinutes から隠れ、
+   * 不意打ちとして届く。省略時は true — 黙っていればプレイヤーは知っている。
+   */
+  announced?: boolean;
   /** Recorded in the morning's highlights once attended. */
   highlight?: string;
 }
@@ -42,23 +54,13 @@ export interface TimedEvent {
   fired: boolean;
 }
 
-export interface ActiveAction {
-  actionId: string;
-  /** Index of the segment that runs next. */
-  segmentIndex: number;
-  minutesSpent: Minutes;
-  startedAt: Minutes;
-  /** Set when an appointment or event cut the action short. */
-  interrupted: boolean;
-  /** Set when every segment has been consumed. */
-  exhausted: boolean;
-}
-
 /** What the player did and how long it took — the morning review reads this. */
 export interface LogEntry {
   label: string;
   minutes: Minutes;
   startedAt: Minutes;
+  /** 移動の一分。続けて歩いた分は一行にまとめる。 */
+  move?: boolean;
 }
 
 export type Phase = "morning" | "review";
@@ -71,19 +73,20 @@ export interface GameState {
     familyName: string;
     givenName: string;
   };
+  /** いまいる場所。画面（mode）とは独立 — 風呂にいるまま電話は見られる。 */
+  place: PlaceId;
   condition: Condition;
   appointments: Appointment[];
   events: TimedEvent[];
+  /** いまどの画面にいるか。 */
+  mode: Mode;
   log: LogEntry[];
   /** Notable moments, in the order they happened. */
   highlights: string[];
+  /** 性格フラグ（設計書28章）。v0.2では貯めるだけで、誰の反応にも使わない。 */
+  flags: string[];
   /** Actions whose segments have all been used up. */
   spentActions: string[];
   /** How far into each action the player has read, so returning to it resumes. */
   actionProgress: Record<string, number>;
-  activeAction: ActiveAction | null;
-  /** Appointment being played out right now. */
-  activeAppointmentId: string | null;
-  /** Event notice currently on screen. */
-  activeEventId: string | null;
 }

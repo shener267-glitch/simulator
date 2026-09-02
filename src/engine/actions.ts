@@ -1,7 +1,7 @@
 import { MORNING_LENGTH, type Minutes } from "../types/clock";
 import type { Segment } from "../types/action";
 import type { GameState } from "../types/game";
-import { nextAppointment } from "./schedule";
+import { nextVisibleAppointment } from "./schedule";
 
 /**
  * The next moment the player's time stops being their own: an appointment they
@@ -31,12 +31,13 @@ export function freeMinutes(state: GameState): Minutes {
 }
 
 /**
- * What the player is allowed to know: the time to the next appointment on the
- * schedule, or to the end of the morning. Events that have not arrived yet are
- * deliberately left out — being cut off by one is supposed to be a surprise.
+ * What the player is allowed to know: the time to the next item on the
+ * schedule, or to the end of the morning. Things that have not been announced
+ * — events that have not arrived, appointments marked `announced: false` — are
+ * deliberately left out; being cut off by one is supposed to be a surprise.
  */
 export function visibleFreeMinutes(state: GameState): Minutes {
-  const appointment = nextAppointment(state);
+  const appointment = nextVisibleAppointment(state);
   const limit = appointment ? Math.min(appointment.at, MORNING_LENGTH) : MORNING_LENGTH;
   return Math.max(0, limit - state.clock);
 }

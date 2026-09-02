@@ -1,15 +1,6 @@
 import type { Appointment } from "../types/game";
 import { SAWATARI, SHINOZUKA } from "./characters";
 
-/** 05:00 起床。時間は消費せず、目覚めた状態を提示するだけの区切り。 */
-export const WAKE_APPOINTMENT: Appointment = {
-  id: "wake",
-  label: "起床",
-  at: 0,
-  minutes: 0,
-  resolved: false,
-};
-
 /** 通常は07:00。突発イベントが入ると前倒しされる（設計書10章）。 */
 export const BRIEFING_APPOINTMENT: Appointment = {
   id: "briefing",

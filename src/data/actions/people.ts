@@ -1,4 +1,5 @@
 import type { Action } from "../../types/action";
+import { ANYWHERE } from "../places";
 import { SAWATARI, SHINOZUKA, WIFE, ELDER_SON, YOUNGER_SON } from "../characters";
 
 /**
@@ -10,6 +11,9 @@ export const TALK_WITH_WIFE: Action = {
   id: "wife",
   label: `${WIFE.name}と話す`,
   category: "people",
+  emoji: "👩",
+  /** 台所に立っている。寝室まで呼びには来ない。 */
+  places: ["living"],
   hint: "台所に灯りがついている",
   perSegment: { fatigue: -1 },
   segments: [
@@ -43,6 +47,9 @@ export const CONSULT_SAWATARI: Action = {
   id: "sawatari",
   label: `${SAWATARI.shortName}に相談する`,
   category: "people",
+  emoji: "👨‍💼",
+  /** 電話なので、どこからでも掛かる。 */
+  places: ANYWHERE,
   hint: "政務担当。八年、そばにいる",
   perSegment: { fatigue: 1 },
   segments: [
@@ -70,6 +77,8 @@ export const CONSULT_SHINOZUKA: Action = {
   id: "shinozuka",
   label: `${SHINOZUKA.shortName}に相談する`,
   category: "people",
+  emoji: "👩‍💼",
+  places: ANYWHERE,
   hint: "事務担当。資料はいつも先に揃っている",
   perSegment: { fatigue: 1 },
   segments: [

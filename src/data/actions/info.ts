@@ -1,4 +1,5 @@
 import type { Action } from "../../types/action";
+import { ANYWHERE } from "../places";
 
 /**
  * 朝のニュースは前日までの出来事を反映する（設計書16章）。
@@ -8,6 +9,9 @@ export const WATCH_NEWS: Action = {
   id: "news",
   label: "ニュースを見る",
   category: "info",
+  emoji: "📰",
+  /** テレビと朝刊。画面と紙のある部屋でしか見られない。 */
+  places: ["bedroom", "living", "study"],
   hint: "テレビと朝刊。世の中が昨日をどう受け取ったか",
   perSegment: { fatigue: 1 },
   segments: [
@@ -58,6 +62,9 @@ export const CHECK_SNS: Action = {
   id: "sns",
   label: "SNSを見る",
   category: "info",
+  emoji: "📱",
+  /** 手の中で完結するので、場所を選ばない（設計書16章）。 */
+  places: ANYWHERE,
   hint: "流れてくるものを、そのまま眺める",
   perSegment: { fatigue: 1 },
   segments: [

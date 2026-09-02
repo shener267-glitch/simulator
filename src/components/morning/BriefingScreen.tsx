@@ -10,7 +10,8 @@ import { useGameDispatch, useGameState } from "../../state/GameContext";
 export function BriefingScreen() {
   const state = useGameState();
   const dispatch = useGameDispatch();
-  const appointment = state.appointments.find((candidate) => candidate.id === state.activeAppointmentId);
+  const appointmentId = state.mode.kind === "appointment" ? state.mode.appointmentId : null;
+  const appointment = state.appointments.find((candidate) => candidate.id === appointmentId);
   if (!appointment) return null;
 
   return (

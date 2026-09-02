@@ -1,10 +1,14 @@
 import type { Action } from "../../types/action";
+import { ANYWHERE } from "../places";
 import { SAWATARI, SHINOZUKA } from "../characters";
 
 export const READ_DOCUMENTS: Action = {
   id: "documents",
   label: "資料を読む",
   category: "work",
+  emoji: "📄",
+  /** 紙の束を広げられる場所でしか読めない。風呂には持ち込まない。 */
+  places: ["bedroom", "study", "office"],
   hint: "昨夜、枕元に置いたまま眠ってしまった束",
   perSegment: { fatigue: 2 },
   segments: [
@@ -40,6 +44,8 @@ export const GIVE_INSTRUCTIONS: Action = {
   id: "instructions",
   label: "秘書官に指示を出す",
   category: "work",
+  emoji: "📋",
+  places: ANYWHERE,
   hint: "調整、根回し、情報収集を頼む",
   perSegment: { fatigue: 1 },
   segments: [

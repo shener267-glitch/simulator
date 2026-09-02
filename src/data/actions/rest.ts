@@ -1,10 +1,13 @@
 import type { Action } from "../../types/action";
+import { ANYWHERE } from "../places";
 import { WIFE } from "../characters";
 
 export const EAT_BREAKFAST: Action = {
   id: "breakfast",
   label: "朝食をとる",
   category: "rest",
+  emoji: "🍳",
+  places: ["living"],
   hint: "食卓に用意されている",
   perSegment: { hunger: -30, fatigue: -2 },
   segments: [
@@ -24,6 +27,9 @@ export const NAP: Action = {
   id: "nap",
   label: "仮眠をとる",
   category: "rest",
+  emoji: "😴",
+  /** 横になれる場所。寝室のベッドか、リビングのソファか。 */
+  places: ["bedroom", "living"],
   hint: "目を閉じるだけでも違う",
   repeatable: true,
   perSegment: { fatigue: -8 },
@@ -38,6 +44,8 @@ export const IDLE: Action = {
   id: "idle",
   label: "少しぼーっとする",
   category: "rest",
+  emoji: "😐",
+  places: ANYWHERE,
   hint: "何もしない",
   repeatable: true,
   perSegment: { fatigue: -3 },
@@ -53,6 +61,9 @@ export const GET_READY: Action = {
   id: "ready",
   label: "身支度をする",
   category: "life",
+  emoji: "🧥",
+  /** 洗面と着替え。鏡のある場所で。 */
+  places: ["bedroom", "bath"],
   hint: "顔を洗い、着替える",
   perSegment: { fatigue: -1 },
   segments: [

@@ -1,7 +1,7 @@
 import { MORNING_LENGTH } from "../../types/clock";
 import { formatClock, formatDuration } from "../../engine/clock";
 import { visibleFreeMinutes } from "../../engine/actions";
-import { nextAppointment } from "../../engine/schedule";
+import { nextVisibleAppointment } from "../../engine/schedule";
 import { MORNING_DATE_LABEL } from "../../data/briefing";
 import { useGameState } from "../../state/GameContext";
 
@@ -12,7 +12,7 @@ import { useGameState } from "../../state/GameContext";
  */
 export function MorningClock() {
   const state = useGameState();
-  const upcoming = nextAppointment(state);
+  const upcoming = nextVisibleAppointment(state);
   const untilNext = visibleFreeMinutes(state);
   const elapsed = Math.min(100, (state.clock / MORNING_LENGTH) * 100);
 

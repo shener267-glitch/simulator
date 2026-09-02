@@ -36,6 +36,22 @@ describe("interruption guard", () => {
     expect(visibleFreeMinutes(state)).toBe(120);
   });
 
+  it("hides an appointment that was never put on the schedule", () => {
+    // 予定表に載っていないものは、時計としては効くが表示には出さない。
+    // 「知らないうちに時間がなくなっていた」を作れる余地を残しておく。
+    const base = awake();
+    const state = {
+      ...base,
+      appointments: [
+        ...base.appointments,
+        { id: "unlisted", label: "", at: 40, minutes: 10, resolved: false, announced: false },
+      ],
+    };
+
+    expect(freeMinutes(state)).toBe(40);
+    expect(visibleFreeMinutes(state)).toBe(120);
+  });
+
   it("counts down to the briefing once the call has moved it", () => {
     const afterCall = playThrough(playThrough(awake(), "news"), "sns");
     expect(afterCall.clock).toBe(70);

@@ -29,7 +29,7 @@ export function WakeScene() {
       return;
     }
     if (isLast) {
-      dispatch({ type: "RESOLVE_APPOINTMENT" });
+      dispatch({ type: "FINISH_WAKE" });
       return;
     }
     setIndex((current) => current + 1);

@@ -1,4 +1,5 @@
 import type { Minutes } from "./clock";
+import type { PlaceId } from "./place";
 
 export type ActionCategory = "info" | "people" | "work" | "rest" | "life";
 
@@ -27,6 +28,13 @@ export interface Action {
   id: string;
   label: string;
   category: ActionCategory;
+  /** Stands in for the action in the menu, ahead of the label (設計書31章). */
+  emoji: string;
+  /**
+   * Where the action can be taken at all. Anything the current place does not
+   * offer is simply left out of the menu rather than shown greyed (設計書16章).
+   */
+  places: PlaceId[];
   /** One line shown under the label in the action list. */
   hint: string;
   segments: Segment[];

@@ -6,7 +6,8 @@ import { useGameDispatch, useGameState } from "../../state/GameContext";
 export function EventNotice() {
   const state = useGameState();
   const dispatch = useGameDispatch();
-  const event = state.events.find((candidate) => candidate.id === state.activeEventId);
+  const eventId = state.mode.kind === "event" ? state.mode.eventId : null;
+  const event = state.events.find((candidate) => candidate.id === eventId);
   if (!event) return null;
 
   return (

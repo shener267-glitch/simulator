@@ -3,6 +3,7 @@ import { MorningClock } from "./MorningClock";
 import { freeMinutes, visibleFreeMinutes } from "../../engine/actions";
 import { formatDuration } from "../../engine/clock";
 import { findAction } from "../../data/actions";
+import { runOf } from "../../types/mode";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
 
 /**
@@ -12,8 +13,8 @@ import { useGameDispatch, useGameState } from "../../state/GameContext";
 export function ActionRunner() {
   const state = useGameState();
   const dispatch = useGameDispatch();
-  const active = state.activeAction;
-  const action = active ? findAction(active.actionId) : undefined;
+  const active = runOf(state.mode);
+  const action = active ? findAction(active.source.actionId) : undefined;
   if (!active || !action) return null;
 
   const shownIndex = active.interrupted ? active.segmentIndex : active.segmentIndex - 1;

@@ -1,5 +1,6 @@
 import type { Action } from "../../types/action";
-import { ACTIONS, CATEGORY_LABELS, CATEGORY_ORDER } from "../../data/actions";
+import { CATEGORY_LABELS, CATEGORY_ORDER } from "../../data/actions";
+import { actionsAt } from "../../engine/places";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
 
 function ActionButton({ action }: { action: Action }) {
@@ -41,9 +42,12 @@ function ActionButton({ action }: { action: Action }) {
 }
 
 export function ActionList() {
+  const state = useGameState();
+  // 現在地でできないことは並べない（設計書16章）。
+  const here = actionsAt(state.place);
   const grouped = CATEGORY_ORDER.map((category) => ({
     category,
-    actions: ACTIONS.filter((action) => action.category === category),
+    actions: here.filter((action) => action.category === category),
   })).filter((group) => group.actions.length > 0);
 
   return (
