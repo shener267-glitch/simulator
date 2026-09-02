@@ -1,7 +1,7 @@
 import { PlaceScreen } from "../place/PlaceScreen";
 import { ActionRunner } from "./ActionRunner";
 import { BriefingScreen } from "./BriefingScreen";
-import { EventNotice } from "./EventNotice";
+import { InterruptNotice } from "./InterruptNotice";
 import { WakeScene } from "./WakeScene";
 import type { RestingMode } from "../../types/mode";
 import { useGameState } from "../../state/GameContext";
@@ -28,12 +28,12 @@ function Base({ mode }: { mode: RestingMode }) {
 export function MorningScreen() {
   const state = useGameState();
   const mode = state.mode;
-  const base = mode.kind === "event" ? mode.resume : mode;
+  const base = mode.kind === "interrupt" ? mode.resume : mode;
 
   return (
     <>
       <Base mode={base} />
-      {mode.kind === "event" && <EventNotice />}
+      {mode.kind === "interrupt" && <InterruptNotice />}
     </>
   );
 }

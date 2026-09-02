@@ -5,18 +5,14 @@ import type { GameState } from "../types/game";
 import { nextVisibleAppointment } from "./schedule";
 
 /**
- * The next moment the player's time stops being their own: an appointment they
- * have to attend, or something that arrives on its own. Null when the rest of
- * the morning is theirs.
+ * The next moment the player's time stops being their own. HARD な予定だけを
+ * 見る — 柔らかい割り込みは時間を切らず、セグメントの切れ目で鳴るだけなので、
+ * ここには入れない（設計書26章）。Null when the rest of the morning is theirs.
  */
 export function nextInterruption(state: GameState): Minutes | null {
-  const times: Minutes[] = [];
-  for (const appointment of state.appointments) {
-    if (!appointment.resolved) times.push(appointment.at);
-  }
-  for (const event of state.events) {
-    if (!event.fired) times.push(event.at);
-  }
+  const times = state.appointments
+    .filter((appointment) => !appointment.resolved)
+    .map((appointment) => appointment.at);
   return times.length > 0 ? Math.min(...times) : null;
 }
 

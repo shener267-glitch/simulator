@@ -1,13 +1,13 @@
 import { MORNING_LENGTH, type Minutes } from "../types/clock";
 import type { Action as FreeAction, ConditionDelta, Segment } from "../types/action";
-import type { GameState, LogEntry } from "../types/game";
+import type { GameState, InterruptChoice, LogEntry } from "../types/game";
 import type { RestingMode, SegmentRun, SegmentSource } from "../types/mode";
 import type { PlaceId } from "../types/place";
 import { durationOptions, interruptionGuard, isSpent, resumeIndex } from "../engine/actions";
 import { isMorningOver } from "../engine/clock";
 import { applyElapsed, clampCondition } from "../engine/condition";
 import { travelMinutes } from "../engine/places";
-import { dueAppointment, dueEvent, moveAppointment } from "../engine/schedule";
+import { dueAppointment, dueInterrupt, moveAppointment } from "../engine/schedule";
 import { placeById } from "../data/places";
 import { findAction } from "../data/actions";
 import { createInitialState } from "./initialState";
@@ -18,7 +18,10 @@ export type GameAction =
   /** 隣の部屋へ。一分を払い、ログに残す。 */
   | { type: "MOVE_TO"; place: PlaceId }
   | { type: "RESOLVE_APPOINTMENT" }
-  | { type: "DISMISS_EVENT" }
+  /** 割り込みの三択（設計書26章）。 */
+  | { type: "ANSWER_INTERRUPT"; choice: InterruptChoice }
+  /** 出て、読み終えた連絡を閉じる。 */
+  | { type: "CLOSE_INTERRUPT" }
   /** 行動を選ぶ。長さを聞く余地があれば「どのくらい？」へ、なければすぐ始める。 */
   | { type: "CHOOSE_ACTION"; actionId: string }
   /** 「どのくらい？」をやめる。時間は動かない。 */
@@ -64,31 +67,20 @@ function pushMove(log: LogEntry[], label: string, minutes: Minutes, startedAt: M
   return [...log, { label, minutes, startedAt, move: true }];
 }
 
-/**
- * 手が空いたときに呼ぶ。自分から届くものが予定より先に立つのは、それが
- * 予定そのものを動かすことがあるから。何も待っていないときだけ朝が終わる。
- */
-function settle(state: GameState): GameState {
-  if (state.phase !== "morning") return state;
-  // 割り込みの入れ子は作らない。
-  if (state.mode.kind === "event") return state;
-  const resume: RestingMode = state.mode;
+function addFlags(flags: string[], added?: string[]): string[] {
+  if (!added?.length) return flags;
+  const next = [...flags];
+  for (const flag of added) if (!next.includes(flag)) next.push(flag);
+  return next;
+}
 
-  const event = dueEvent(state, state.clock);
-  if (event) {
-    const move = event.movesAppointment;
-    return {
-      ...state,
-      appointments: move
-        ? moveAppointment(state.appointments, move.appointmentId, move.to, state.clock)
-        : state.appointments,
-      events: state.events.map((candidate) =>
-        candidate.id === event.id ? { ...candidate, fired: true } : candidate,
-      ),
-      highlights: [...state.highlights, event.highlight],
-      mode: { kind: "event", eventId: event.id, resume },
-    };
-  }
+/**
+ * 予定と朝の終わり。手が空いたときにだけ呼ぶ。セグメントの途中で呼ぶと、
+ * 切られた瞬間に予定の画面へ飛んでしまい、「——そこで時間になった。」を
+ * 読む間がなくなる。
+ */
+function settleHard(state: GameState): GameState {
+  if (state.phase !== "morning") return state;
 
   const appointment = dueAppointment(state, state.clock);
   if (appointment) {
@@ -100,6 +92,40 @@ function settle(state: GameState): GameState {
   }
 
   return state;
+}
+
+/**
+ * 自分から届くもの。セグメントの切れ目ごとに呼ぶ（設計書26章）。
+ * 予定変更はプレイヤーが答える前、鳴った瞬間に当てる — どう答えても
+ * 起きることなので、選択の結果に見えてはいけない。
+ */
+function settleSoft(state: GameState): GameState {
+  if (state.phase !== "morning") return state;
+  // 起床中は鳴らさない。割り込みの入れ子も作らない。
+  if (state.mode.kind === "wake" || state.mode.kind === "interrupt") return state;
+  const resume: RestingMode = state.mode;
+
+  const interrupt = dueInterrupt(state, state.clock);
+  if (!interrupt) return state;
+
+  const move = interrupt.movesAppointment;
+  return {
+    ...state,
+    // 切れ目まで遅れて鳴ると、繰り上げ先がもう過去のことがある。現在時刻で止める。
+    appointments: move
+      ? moveAppointment(state.appointments, move.appointmentId, move.to, state.clock)
+      : state.appointments,
+    interrupts: state.interrupts.map((candidate) =>
+      candidate.id === interrupt.id ? { ...candidate, fired: true } : candidate,
+    ),
+    highlights: [...state.highlights, interrupt.highlight],
+    mode: { kind: "interrupt", interruptId: interrupt.id, answered: false, resume },
+  };
+}
+
+/** 手が空いた。予定が先に立ち、そのうえで連絡が鳴る。 */
+function settle(state: GameState): GameState {
+  return settleSoft(settleHard(state));
 }
 
 /**
@@ -126,7 +152,7 @@ function consumeSegment(state: GameState, script: Script, run: SegmentRun): Game
 
   const segmentIndex = fits ? run.segmentIndex + 1 : run.segmentIndex;
 
-  return {
+  const next: GameState = {
     ...state,
     clock: state.clock + spent,
     condition,
@@ -141,6 +167,33 @@ function consumeSegment(state: GameState, script: Script, run: SegmentRun): Game
         exhausted: fits && segmentIndex >= script.segments.length,
       },
     },
+  };
+
+  // 切れ目に着いたときだけ連絡が鳴る。予定に切られた回は鳴らさない —
+  // 「そこで時間になった」を読ませてから、手が空いたところで届ける。
+  return fits ? settleSoft(next) : next;
+}
+
+/** 走り終えた run の記録だけを残す。画面はここでは動かさない。 */
+function recordRun(state: GameState, run: SegmentRun): GameState {
+  const script = scriptFor(run.source);
+  if (!script) return state;
+
+  const actionId = run.source.actionId;
+  const spent = run.minutesSpent;
+  const usedUp = run.segmentIndex >= script.segments.length;
+
+  return {
+    ...state,
+    log:
+      spent > 0
+        ? [...state.log, { label: script.label, minutes: spent, startedAt: run.startedAt }]
+        : state.log,
+    spentActions:
+      usedUp && !script.repeatable && !state.spentActions.includes(actionId)
+        ? [...state.spentActions, actionId]
+        : state.spentActions,
+    actionProgress: { ...state.actionProgress, [actionId]: run.segmentIndex },
   };
 }
 
@@ -169,27 +222,7 @@ function beginAction(state: GameState, action: FreeAction, target: Minutes | nul
 /** Close out the running action: record the time, then see what is waiting. */
 function finishRun(state: GameState): GameState {
   if (state.mode.kind !== "action") return state;
-  const run = state.mode.run;
-  const script = scriptFor(run.source);
-  if (!script) return { ...state, mode: { kind: "place" } };
-
-  const actionId = run.source.actionId;
-  const spent = run.minutesSpent;
-  const usedUp = run.segmentIndex >= script.segments.length;
-
-  return settle({
-    ...state,
-    mode: { kind: "place" },
-    log:
-      spent > 0
-        ? [...state.log, { label: script.label, minutes: spent, startedAt: run.startedAt }]
-        : state.log,
-    spentActions:
-      usedUp && !script.repeatable && !state.spentActions.includes(actionId)
-        ? [...state.spentActions, actionId]
-        : state.spentActions,
-    actionProgress: { ...state.actionProgress, [actionId]: run.segmentIndex },
-  });
+  return settle({ ...recordRun(state, state.mode.run), mode: { kind: "place" } });
 }
 
 export function gameReducer(state: GameState, gameAction: GameAction): GameState {
@@ -214,9 +247,68 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
       });
     }
 
-    case "DISMISS_EVENT": {
-      if (state.mode.kind !== "event") return state;
-      return settle({ ...state, mode: state.mode.resume });
+    case "ANSWER_INTERRUPT": {
+      if (state.mode.kind !== "interrupt" || state.mode.answered) return state;
+      const mode = state.mode;
+      const interrupt = state.interrupts.find((candidate) => candidate.id === mode.interruptId);
+      if (!interrupt) return state;
+
+      const choice = gameAction.choice;
+      const marked: GameState = {
+        ...state,
+        flags: addFlags(state.flags, interrupt.flags?.[choice]),
+        interrupts: state.interrupts.map((candidate) =>
+          candidate.id === interrupt.id ? { ...candidate, answeredWith: choice } : candidate,
+        ),
+      };
+
+      if (choice === "answer") {
+        // 手を止めて出る。走っていた行動はここで終わり、使った分が記録される。
+        const closed =
+          mode.resume.kind === "action"
+            ? recordRun({ ...marked, mode: mode.resume }, mode.resume.run)
+            : marked;
+
+        const room = interruptionGuard(closed) - closed.clock;
+        const spent = Math.max(0, Math.min(interrupt.minutes, room));
+
+        return {
+          ...closed,
+          clock: closed.clock + spent,
+          condition: applyElapsed(closed.condition, spent),
+          log:
+            spent > 0
+              ? [
+                  ...closed.log,
+                  { label: `${interrupt.from}からの連絡`, minutes: spent, startedAt: closed.clock },
+                ]
+              : closed.log,
+          mode: { kind: "interrupt", interruptId: interrupt.id, answered: true, resume: { kind: "place" } },
+        };
+      }
+
+      // 後回しにするか、無視するか。どちらも時間は使わず、元の画面に戻る。
+      // 違うのは、あとから読めるかどうかだけ。
+      const messages =
+        choice === "defer"
+          ? [
+              ...marked.phone.messages,
+              {
+                id: interrupt.id,
+                from: interrupt.message.from,
+                at: marked.clock,
+                body: interrupt.message.body,
+                read: false,
+              },
+            ]
+          : marked.phone.messages;
+
+      return { ...marked, phone: { messages }, mode: mode.resume };
+    }
+
+    case "CLOSE_INTERRUPT": {
+      if (state.mode.kind !== "interrupt" || !state.mode.answered) return state;
+      return settle({ ...state, mode: { kind: "place" } });
     }
 
     case "RESOLVE_APPOINTMENT": {

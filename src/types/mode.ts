@@ -43,11 +43,20 @@ export type RestingMode =
  * だけ」という決まりを二箇所の場当たりなガードで支えていた。判別可能
  * ユニオンにすると、ありえない組み合わせがそもそも書けなくなる。
  */
-export type Mode = RestingMode | { kind: "event"; eventId: string; resume: RestingMode };
+export type Mode =
+  | RestingMode
+  | {
+      kind: "interrupt";
+      interruptId: string;
+      /** 三択に答えたか。まだなら選択肢、答えたあとは本編。 */
+      answered: boolean;
+      /** 後回し・無視で戻る先。鳴った時点の画面。 */
+      resume: RestingMode;
+    };
 
 /** いま走っている run。走っていなければ null。 */
 export function runOf(mode: Mode): SegmentRun | null {
   if (mode.kind === "action") return mode.run;
-  if (mode.kind === "event" && mode.resume.kind === "action") return mode.resume.run;
+  if (mode.kind === "interrupt" && mode.resume.kind === "action") return mode.resume.run;
   return null;
 }

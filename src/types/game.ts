@@ -36,22 +36,50 @@ export interface Appointment {
   highlight?: string;
 }
 
-/** Something that arrives on its own at a set time (設計書17章). */
-export interface TimedEvent {
+export type InterruptChoice = "answer" | "defer" | "ignore";
+
+/**
+ * Something that arrives on its own — SOFT（設計書17章・26章）。予定と違って
+ * セグメントを途中で切らない。切れ目で鳴り、出るか、後回しにするか、無視する
+ * かをプレイヤーが選ぶ。
+ */
+export interface SoftInterrupt {
   id: string;
   at: Minutes;
   title: string;
   /** Who got in touch. */
   from: string;
+  /** 中身を明かさない予告。三択の上に出す。 */
+  teaser: string[];
+  /** 「中断して確認する」で初めて読める本編。 */
   body: string[];
-  /** Pulls an appointment to a new time when the event fires. */
+  /** 出た場合に使う分。 */
+  minutes: Minutes;
+  /** 後回し・無視したときに電話へ残る中身。あとから読める。 */
+  message: { from: string; body: string[] };
+  /**
+   * どう答えても起きる予定変更。世界の側の動きであって、プレイヤーの
+   * 選択で止まるものではない。
+   */
   movesAppointment?: {
     appointmentId: string;
     to: Minutes;
     note: string;
   };
+  /** 選び方によって積む性格フラグ（設計書28章）。 */
+  flags?: Partial<Record<InterruptChoice, string[]>>;
   highlight: string;
   fired: boolean;
+  answeredWith: InterruptChoice | null;
+}
+
+/** 電話に残っているもの。後回しにした連絡はここに落ちる。 */
+export interface PhoneMessage {
+  id: string;
+  from: string;
+  at: Minutes;
+  body: string[];
+  read: boolean;
 }
 
 /** What the player did and how long it took — the morning review reads this. */
@@ -76,10 +104,13 @@ export interface GameState {
   /** いまいる場所。画面（mode）とは独立 — 風呂にいるまま電話は見られる。 */
   place: PlaceId;
   condition: Condition;
+  /** HARD。跨ぐセグメントを切る。interruptionGuard が見るのはこれだけ。 */
   appointments: Appointment[];
-  events: TimedEvent[];
+  /** SOFT。ガードには入らず、セグメントの切れ目で鳴る。 */
+  interrupts: SoftInterrupt[];
   /** いまどの画面にいるか。 */
   mode: Mode;
+  phone: { messages: PhoneMessage[] };
   log: LogEntry[];
   /** Notable moments, in the order they happened. */
   highlights: string[];

@@ -98,11 +98,40 @@ export function ItemSheet({ onClose }: { onClose: () => void }) {
   }
 
   if (view === "messages") {
+    const messages = state.phone.messages;
+
     return (
       <Modal title="メッセージ" onClose={onClose}>
-        <p className="px-1 py-2 text-[0.88rem] leading-[1.9] text-body-muted">
-          未読はない。夜のうちに届いたものは、もう秘書官が捌いている。
-        </p>
+        {messages.length === 0 ? (
+          <p className="px-1 py-2 text-[0.88rem] leading-[1.9] text-body-muted">
+            未読はない。夜のうちに届いたものは、もう秘書官が捌いている。
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {messages.map((message) => (
+              <article
+                key={message.id}
+                className="rounded-xl border border-line bg-ink-panel px-4 py-3.5"
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-[0.8rem] font-medium tracking-wider text-brass">
+                    {message.from}
+                  </span>
+                  <span className="figures shrink-0 text-[0.75rem] text-body-muted">
+                    {formatClock(message.at)}
+                  </span>
+                </div>
+                <div className="mt-2.5 flex flex-col gap-2">
+                  {message.body.map((line) => (
+                    <p key={line} className="text-[0.86rem] leading-[1.9] text-body-muted">
+                      {line}
+                    </p>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
         <BackRow onBack={() => setView("phone")} />
       </Modal>
     );
@@ -136,7 +165,9 @@ export function ItemSheet({ onClose }: { onClose: () => void }) {
                   ? spent
                     ? "見終えた"
                     : formatDuration(actionMinutesLeft(state, action))
-                  : undefined
+                  : app.id === "messages" && state.phone.messages.length > 0
+                    ? `${state.phone.messages.length}件`
+                    : undefined
               }
               disabled={Boolean(action) && spent}
               onClick={() => {

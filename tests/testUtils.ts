@@ -26,10 +26,17 @@ export function currentRun(state: GameState): SegmentRun | null {
   return runOf(state.mode);
 }
 
+/** 06:10の着信をすでに済ませたことにする。予定に切られる側だけを見たいとき用。 */
+export function withoutCall(state: GameState): GameState {
+  return { ...state, interrupts: state.interrupts.map((item) => ({ ...item, fired: true })) };
+}
+
 /** Play one action from start to finish, or until something cuts it short. */
 export function playThrough(state: GameState, actionId: string): GameState {
   let next = gameReducer(state, { type: "START_ACTION", actionId });
   for (let guard = 0; guard < 50; guard += 1) {
+    // 連絡が鳴ったら、そこで手が止まる。答えるのは呼び出した側の仕事。
+    if (next.mode.kind === "interrupt") return next;
     const active = currentRun(next);
     if (!active || active.exhausted || active.interrupted) break;
     const before = next.clock;

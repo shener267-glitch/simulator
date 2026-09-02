@@ -1,6 +1,6 @@
 import type { GameState } from "../types/game";
 import { BRIEFING_APPOINTMENT } from "../data/briefing";
-import { MORNING_EVENT } from "../data/morningEvent";
+import { MORNING_CALL } from "../data/morningInterrupts";
 import { PLAYER_DEFAULT_NAME } from "../data/characters";
 import { STARTING_PLACE } from "../data/places";
 
@@ -23,8 +23,9 @@ export function createInitialState(player?: GameState["player"]): GameState {
     place: STARTING_PLACE,
     condition: { fatigue: 55, hunger: 45 },
     appointments: [{ ...BRIEFING_APPOINTMENT }],
-    events: [{ ...MORNING_EVENT }],
+    interrupts: [{ ...MORNING_CALL }],
     mode: { kind: "wake" },
+    phone: { messages: [] },
     log: [],
     highlights: [],
     flags: [],

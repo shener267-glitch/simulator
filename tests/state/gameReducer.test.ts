@@ -4,7 +4,7 @@ import { createInitialState } from "../../src/state/initialState";
 import { durationOptions, remainingToTarget } from "../../src/engine/actions";
 import { actionsAt } from "../../src/engine/places";
 import { findAction } from "../../src/data/actions";
-import { at, awake, currentRun, playThrough, run, totalLogged } from "../testUtils";
+import { at, awake, currentRun, playThrough, run, totalLogged, withoutCall } from "../testUtils";
 
 describe("waking up", () => {
   it("opens on the 05:00 wake-up and costs no time", () => {
@@ -197,62 +197,134 @@ describe("moving around the residence", () => {
   });
 });
 
-describe("interruptions", () => {
-  it("cuts an action short at the interruption and charges only the minutes that were left", () => {
+describe("appointments, which are not negotiable", () => {
+  it("cuts an action short at the appointment and charges only the minutes that were left", () => {
+    // 06:50。07:00のブリーフィングまで10分しかないところに15分のニュース。
+    const state = gameReducer(
+      { ...withoutCall(awake()), clock: 110 },
+      { type: "START_ACTION", actionId: "news" },
+    );
+
+    expect(state.clock).toBe(120);
+    expect(currentRun(state)?.interrupted).toBe(true);
+    expect(currentRun(state)?.minutesSpent).toBe(10);
+
+    const stopped = gameReducer(state, { type: "STOP_ACTION" });
+    expect(stopped.log[stopped.log.length - 1]).toEqual({
+      label: "ニュースを見る",
+      minutes: 10,
+      startedAt: 110,
+    });
+    // 読み切っていないので、あとでニュースの続きから読める。
+    expect(stopped.actionProgress.news).toBe(0);
+  });
+
+  it("runs the briefing for its full half hour once the player sits down for it", () => {
+    let state = { ...withoutCall(awake()), clock: 120 };
+    state = gameReducer(state, { type: "FINISH_WAKE" }); // すでに place なので何も起きない
+    state = gameReducer({ ...state, mode: { kind: "place" } }, { type: "MOVE_TO", place: "corridor" });
+
+    expect(state.mode).toMatchObject({ kind: "appointment", appointmentId: "briefing" });
+
+    state = gameReducer(state, { type: "RESOLVE_APPOINTMENT" });
+    expect(state.clock).toBe(151);
+    expect(state.highlights).toContain("沢渡と篠塚から本日の日程の説明を受けた。");
+  });
+});
+
+describe("the call that arrives on its own", () => {
+  /** 06:05まで進めて、次の一区切りで着信を受ける。 */
+  function upToTheCall() {
     let state = playThrough(awake(), "documents"); // 30分 → 05:30
     state = playThrough(state, "ready"); // 20分 → 05:50
     state = playThrough(state, "idle"); // 15分 → 06:05
     expect(state.clock).toBe(65);
+    return state;
+  }
 
-    // 15分のニュースを始めるが、06:10の連絡まで5分しかない。
-    state = gameReducer(state, { type: "START_ACTION", actionId: "news" });
-    expect(state.clock).toBe(70);
-    expect(currentRun(state)?.interrupted).toBe(true);
-    expect(currentRun(state)?.minutesSpent).toBe(5);
+  it("does not cut the segment short the way an appointment does", () => {
+    // 06:05に15分のニュース。着信は06:10だが、区切りまでは切られない。
+    const state = gameReducer(upToTheCall(), { type: "START_ACTION", actionId: "news" });
 
-    state = gameReducer(state, { type: "STOP_ACTION" });
-    expect(state.log[state.log.length - 1]).toEqual({
-      label: "ニュースを見る",
-      minutes: 5,
-      startedAt: 65,
+    expect(state.clock).toBe(80);
+    expect(currentRun(state)?.interrupted).toBe(false);
+    expect(currentRun(state)?.minutesSpent).toBe(15);
+  });
+
+  it("rings at the end of the segment, over the action the player was in", () => {
+    const state = gameReducer(upToTheCall(), { type: "START_ACTION", actionId: "news" });
+
+    expect(state.mode).toMatchObject({
+      kind: "interrupt",
+      interruptId: "funding-report",
+      answered: false,
+      resume: { kind: "action" },
     });
-    // 読み切っていないので、あとでニュースの続きから読める。
-    expect(state.actionProgress.news).toBe(0);
   });
 
-  it("brings the briefing forward from 07:00 to 06:30 when the call comes in", () => {
-    const before = awake();
-    expect(before.appointments.find((a) => a.id === "briefing")?.at).toBe(120);
+  it("moves the briefing to 06:30 whichever way the player answers", () => {
+    expect(awake().appointments.find((a) => a.id === "briefing")?.at).toBe(120);
 
-    let state = playThrough(before, "news"); // 60分 → 06:00
-    state = playThrough(state, "sns"); // 06:10の連絡で頭打ち
-    expect(state.clock).toBe(70);
-    expect(state.mode).toMatchObject({ kind: "event", eventId: "funding-report" });
-    expect(state.appointments.find((a) => a.id === "briefing")?.at).toBe(90);
-    expect(state.highlights.some((line) => line.includes("06:30"))).toBe(true);
+    for (const choice of ["answer", "defer", "ignore"] as const) {
+      const rung = gameReducer(upToTheCall(), { type: "START_ACTION", actionId: "news" });
+      const answered = gameReducer(rung, { type: "ANSWER_INTERRUPT", choice });
+
+      expect(answered.appointments.find((a) => a.id === "briefing")?.at).toBe(90);
+      expect(answered.highlights.some((line) => line.includes("06:30"))).toBe(true);
+    }
   });
 
-  it("comes back to the screen the call arrived over", () => {
-    let state = playThrough(playThrough(awake(), "news"), "sns");
-    expect(state.mode).toMatchObject({ kind: "event", resume: { kind: "place" } });
+  it("goes back to the same action when the player puts it off, and leaves it on the phone", () => {
+    const rung = gameReducer(upToTheCall(), { type: "START_ACTION", actionId: "news" });
+    const before = currentRun(rung)!;
 
-    state = gameReducer(state, { type: "DISMISS_EVENT" });
-    expect(state.mode.kind).toBe("place");
-    expect(state.clock).toBe(70);
+    const deferred = gameReducer(rung, { type: "ANSWER_INTERRUPT", choice: "defer" });
+
+    expect(deferred.clock).toBe(80);
+    expect(deferred.mode.kind).toBe("action");
+    expect(currentRun(deferred)).toEqual(before);
+    expect(deferred.phone.messages).toHaveLength(1);
+    expect(deferred.phone.messages[0].from).toBe("官房長官");
+    expect(deferred.flags).toContain("deferred-the-call");
   });
 
-  it("runs the briefing for its full half hour once the player sits down for it", () => {
-    let state = playThrough(playThrough(awake(), "news"), "sns");
-    state = gameReducer(state, { type: "DISMISS_EVENT" });
+  it("leaves nothing to read when the player ignores it", () => {
+    const rung = gameReducer(upToTheCall(), { type: "START_ACTION", actionId: "news" });
+    const ignored = gameReducer(rung, { type: "ANSWER_INTERRUPT", choice: "ignore" });
 
-    state = playThrough(state, "idle"); // 15分 → 06:25
-    state = playThrough(state, "idle"); // 06:30で頭打ち
-    expect(state.clock).toBe(90);
-    expect(state.mode).toMatchObject({ kind: "appointment", appointmentId: "briefing" });
+    expect(ignored.clock).toBe(80);
+    expect(ignored.mode.kind).toBe("action");
+    expect(ignored.phone.messages).toHaveLength(0);
+    expect(ignored.flags).toContain("ignored-the-call");
+  });
 
-    state = gameReducer(state, { type: "RESOLVE_APPOINTMENT" });
-    expect(state.clock).toBe(120);
-    expect(state.highlights).toContain("沢渡と篠塚から本日の日程の説明を受けた。");
+  it("ends the action and spends the minutes when the player takes it", () => {
+    const rung = gameReducer(upToTheCall(), { type: "START_ACTION", actionId: "news" });
+    const answered = gameReducer(rung, { type: "ANSWER_INTERRUPT", choice: "answer" });
+
+    expect(answered.clock).toBe(90);
+    expect(answered.mode).toMatchObject({ kind: "interrupt", answered: true });
+    // 手を止めた行動は、そこまでの分がきちんと記録される。
+    expect(answered.log.map((entry) => entry.label)).toContain("ニュースを見る");
+    expect(answered.log[answered.log.length - 1]).toEqual({
+      label: "官房長官からの連絡",
+      minutes: 10,
+      startedAt: 80,
+    });
+    expect(answered.actionProgress.news).toBe(1);
+
+    const closed = gameReducer(answered, { type: "CLOSE_INTERRUPT" });
+    // 06:30。閉じた先はもうブリーフィングの時間。
+    expect(closed.mode).toMatchObject({ kind: "appointment", appointmentId: "briefing" });
+  });
+
+  it("only rings once, whatever else happens", () => {
+    const rung = gameReducer(upToTheCall(), { type: "START_ACTION", actionId: "news" });
+    let state = gameReducer(rung, { type: "ANSWER_INTERRUPT", choice: "defer" });
+    state = gameReducer(state, { type: "STOP_ACTION" });
+
+    expect(state.interrupts.every((item) => item.fired)).toBe(true);
+    expect(state.mode.kind).not.toBe("interrupt");
   });
 });
 
@@ -260,8 +332,14 @@ describe("the whole morning", () => {
   function playUntilReview() {
     let state = awake();
     for (let guard = 0; guard < 400 && state.phase === "morning"; guard += 1) {
-      if (state.mode.kind === "event") {
-        state = gameReducer(state, { type: "DISMISS_EVENT" });
+      if (state.mode.kind === "interrupt") {
+        state = state.mode.answered
+          ? gameReducer(state, { type: "CLOSE_INTERRUPT" })
+          : gameReducer(state, { type: "ANSWER_INTERRUPT", choice: "answer" });
+        continue;
+      }
+      if (state.mode.kind === "duration") {
+        state = gameReducer(state, { type: "CANCEL_DURATION" });
         continue;
       }
       if (state.mode.kind === "appointment") {
@@ -287,7 +365,7 @@ describe("the whole morning", () => {
   it("always gets the call and the briefing in, however the time was spent", () => {
     const state = playUntilReview();
 
-    expect(state.events.every((event) => event.fired)).toBe(true);
+    expect(state.interrupts.every((item) => item.fired)).toBe(true);
     expect(state.appointments.every((appointment) => appointment.resolved)).toBe(true);
     expect(state.log.some((entry) => entry.label.includes("ブリーフィング"))).toBe(true);
   });

@@ -1,5 +1,5 @@
 import type { Minutes } from "../types/clock";
-import type { Appointment, GameState, TimedEvent } from "../types/game";
+import type { Appointment, GameState, SoftInterrupt } from "../types/game";
 
 /** 予定表に載っているか。省略されていれば載っている扱い。 */
 export function isAnnounced(appointment: Appointment): boolean {
@@ -42,8 +42,9 @@ export function moveAppointment(
   );
 }
 
-export function dueEvent(state: GameState, clock: Minutes): TimedEvent | null {
-  const pending = state.events.filter((event) => !event.fired && event.at <= clock);
+/** 鳴る時刻を過ぎていて、まだ鳴っていないもののうち最も早いもの。 */
+export function dueInterrupt(state: GameState, clock: Minutes): SoftInterrupt | null {
+  const pending = state.interrupts.filter((item) => !item.fired && item.at <= clock);
   if (pending.length === 0) return null;
   return pending.reduce((soonest, candidate) => (candidate.at < soonest.at ? candidate : soonest));
 }
