@@ -14,6 +14,8 @@ function Base({ mode }: { mode: RestingMode }) {
       return <ActionRunner />;
     case "appointment":
       return <BriefingScreen />;
+    // 「どのくらい？」は現在地の画面に重ねて出す。
+    case "duration":
     case "place":
       return <PlaceScreen />;
   }

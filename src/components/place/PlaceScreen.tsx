@@ -5,6 +5,7 @@ import { ActionSheet } from "./ActionSheet";
 import { MoveSheet } from "./MoveSheet";
 import { TalkSheet } from "./TalkSheet";
 import { ItemSheet } from "./ItemSheet";
+import { DurationSheet } from "./DurationSheet";
 import { ConditionMeter } from "../shared/ConditionMeter";
 import { describeCondition, hungerGauge } from "../../engine/condition";
 import { useGameState } from "../../state/GameContext";
@@ -44,6 +45,8 @@ export function PlaceScreen() {
       </div>
 
       <CommandBar onOpen={setPanel} />
+
+      {state.mode.kind === "duration" && <DurationSheet />}
 
       {panel === "act" && <ActionSheet onClose={() => setPanel(null)} />}
       {panel === "talk" && <TalkSheet onClose={() => setPanel(null)} />}

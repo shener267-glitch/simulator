@@ -36,7 +36,7 @@ export function TalkSheet({ onClose }: { onClose: () => void }) {
               meta={spent ? "済んだ" : formatDuration(actionMinutesLeft(state, action))}
               disabled={spent}
               onClick={() => {
-                dispatch({ type: "START_ACTION", actionId: action.id });
+                dispatch({ type: "CHOOSE_ACTION", actionId: action.id });
                 onClose();
               }}
             />

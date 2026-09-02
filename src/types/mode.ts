@@ -32,6 +32,8 @@ export interface SegmentRun {
 export type RestingMode =
   | { kind: "wake" }
   | { kind: "place" }
+  /** 「どのくらい？」を聞いている最中。まだ時間は動いていない（設計書6章）。 */
+  | { kind: "duration"; actionId: string }
   | { kind: "action"; run: SegmentRun }
   | { kind: "appointment"; appointmentId: string };
 

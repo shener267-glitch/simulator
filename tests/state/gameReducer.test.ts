@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { gameReducer } from "../../src/state/gameReducer";
 import { createInitialState } from "../../src/state/initialState";
+import { durationOptions, remainingToTarget } from "../../src/engine/actions";
 import { actionsAt } from "../../src/engine/places";
+import { findAction } from "../../src/data/actions";
 import { at, awake, currentRun, playThrough, run, totalLogged } from "../testUtils";
 
 describe("waking up", () => {
@@ -73,6 +75,79 @@ describe("spending time on an action", () => {
       actionId: "breakfast",
     });
     expect(inTheLivingRoom.clock).toBe(10);
+  });
+});
+
+describe("choosing how long to spend", () => {
+  it("asks before it starts, and asking costs nothing", () => {
+    const asked = gameReducer(awake(), { type: "CHOOSE_ACTION", actionId: "documents" });
+    expect(asked.clock).toBe(0);
+    expect(asked.mode).toMatchObject({ kind: "duration", actionId: "documents" });
+
+    const cancelled = gameReducer(asked, { type: "CANCEL_DURATION" });
+    expect(cancelled.clock).toBe(0);
+    expect(cancelled.mode.kind).toBe("place");
+  });
+
+  it("does not ask when there is only one length to pick", () => {
+    // 少しぼーっとするは15分ひと区切りしかない。聞くだけ無駄なので始める。
+    const started = gameReducer(awake(), { type: "CHOOSE_ACTION", actionId: "idle" });
+    expect(started.mode.kind).toBe("action");
+    expect(started.clock).toBe(15);
+  });
+
+  it("offers the lengths the segments actually add up to", () => {
+    const state = awake();
+    const options = durationOptions(state, findAction("documents")!);
+    expect(options.map((option) => option.minutes)).toEqual([10, 20, 30]);
+    expect(options.every((option) => option.available)).toBe(true);
+  });
+
+  it("shows a length that will not fit, but refuses to start it", () => {
+    // 06:40。ブリーフィングまで20分しかないので、30分は選べない。
+    const late = { ...awake(), clock: 100 };
+    const options = durationOptions(late, findAction("documents")!);
+    expect(options.map((option) => [option.minutes, option.available])).toEqual([
+      [10, true],
+      [20, true],
+      [30, false],
+    ]);
+
+    const refused = run(
+      late,
+      { type: "CHOOSE_ACTION", actionId: "documents" },
+      { type: "START_ACTION", actionId: "documents", targetMinutes: 30 },
+    );
+    expect(refused.clock).toBe(100);
+    expect(refused.mode.kind).toBe("duration");
+  });
+
+  it("treats the chosen length as a target, not a commitment", () => {
+    // 30分と答えてから10分でやめる。払うのは10分だけ（設計書8章）。
+    const after = run(
+      awake(),
+      { type: "CHOOSE_ACTION", actionId: "documents" },
+      { type: "START_ACTION", actionId: "documents", targetMinutes: 30 },
+      { type: "STOP_ACTION" },
+    );
+
+    expect(after.clock).toBe(10);
+    expect(after.log).toEqual([{ label: "資料を読む", minutes: 10, startedAt: 0 }]);
+    expect(after.actionProgress.documents).toBe(1);
+  });
+
+  it("counts down to the target and then stops counting", () => {
+    let state = run(
+      awake(),
+      { type: "CHOOSE_ACTION", actionId: "documents" },
+      { type: "START_ACTION", actionId: "documents", targetMinutes: 20 },
+    );
+    expect(remainingToTarget(currentRun(state)!)).toBe(10);
+
+    state = gameReducer(state, { type: "CONTINUE_SEGMENT" });
+    expect(remainingToTarget(currentRun(state)!)).toBeNull();
+    // 目安に届いても勝手には止まらない。まだ続けられる。
+    expect(currentRun(state)?.exhausted).toBe(false);
   });
 });
 

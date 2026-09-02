@@ -3,7 +3,7 @@ import type { Action as FreeAction, ConditionDelta, Segment } from "../types/act
 import type { GameState, LogEntry } from "../types/game";
 import type { RestingMode, SegmentRun, SegmentSource } from "../types/mode";
 import type { PlaceId } from "../types/place";
-import { interruptionGuard } from "../engine/actions";
+import { durationOptions, interruptionGuard, isSpent, resumeIndex } from "../engine/actions";
 import { isMorningOver } from "../engine/clock";
 import { applyElapsed, clampCondition } from "../engine/condition";
 import { travelMinutes } from "../engine/places";
@@ -19,6 +19,10 @@ export type GameAction =
   | { type: "MOVE_TO"; place: PlaceId }
   | { type: "RESOLVE_APPOINTMENT" }
   | { type: "DISMISS_EVENT" }
+  /** 行動を選ぶ。長さを聞く余地があれば「どのくらい？」へ、なければすぐ始める。 */
+  | { type: "CHOOSE_ACTION"; actionId: string }
+  /** 「どのくらい？」をやめる。時間は動かない。 */
+  | { type: "CANCEL_DURATION" }
   /** targetMinutes は「どのくらい？」の答え。時間の計算には効かない。 */
   | { type: "START_ACTION"; actionId: string; targetMinutes?: Minutes }
   | { type: "CONTINUE_SEGMENT" }
@@ -140,6 +144,28 @@ function consumeSegment(state: GameState, script: Script, run: SegmentRun): Game
   };
 }
 
+/** ここで始められる行動。現在地にないもの、読み切ったものは返さない。 */
+function available(state: GameState, actionId: string): FreeAction | null {
+  const action = findAction(actionId);
+  if (!action) return null;
+  // 現在地でできないことは、そもそも起こらない（設計書16章）。
+  if (!action.places.includes(state.place)) return null;
+  if (isSpent(state, action)) return null;
+  return action;
+}
+
+function beginAction(state: GameState, action: FreeAction, target: Minutes | null): GameState {
+  return consumeSegment(state, scriptOf(action), {
+    source: { kind: "action", actionId: action.id },
+    segmentIndex: resumeIndex(state, action),
+    minutesSpent: 0,
+    startedAt: state.clock,
+    targetMinutes: target,
+    interrupted: false,
+    exhausted: false,
+  });
+}
+
 /** Close out the running action: record the time, then see what is waiting. */
 function finishRun(state: GameState): GameState {
   if (state.mode.kind !== "action") return state;
@@ -221,26 +247,35 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
       });
     }
 
-    case "START_ACTION": {
+    case "CHOOSE_ACTION": {
       if (state.mode.kind !== "place") return state;
-      const action = findAction(gameAction.actionId);
+      const action = available(state, gameAction.actionId);
       if (!action) return state;
-      // 現在地でできないことは、そもそも起こらない（設計書16章）。
-      if (!action.places.includes(state.place)) return state;
-      if (state.spentActions.includes(action.id)) return state;
 
-      const resumeAt = action.repeatable ? 0 : (state.actionProgress[action.id] ?? 0);
-      if (resumeAt >= action.segments.length) return state;
+      // 選べる長さが一つしかないなら、わざわざ聞かない。
+      const options = durationOptions(state, action);
+      if (options.length <= 1) return beginAction(state, action, null);
 
-      return consumeSegment(state, scriptOf(action), {
-        source: { kind: "action", actionId: action.id },
-        segmentIndex: resumeAt,
-        minutesSpent: 0,
-        startedAt: state.clock,
-        targetMinutes: gameAction.targetMinutes ?? null,
-        interrupted: false,
-        exhausted: false,
-      });
+      return { ...state, mode: { kind: "duration", actionId: action.id } };
+    }
+
+    case "CANCEL_DURATION": {
+      if (state.mode.kind !== "duration") return state;
+      return { ...state, mode: { kind: "place" } };
+    }
+
+    case "START_ACTION": {
+      if (state.mode.kind !== "place" && state.mode.kind !== "duration") return state;
+      const action = available(state, gameAction.actionId);
+      if (!action) return state;
+
+      const target = gameAction.targetMinutes ?? null;
+      // 次の予定に入らない長さは選べない。押せてしまう経路も塞いでおく。
+      if (target !== null && !durationOptions(state, action).some((o) => o.minutes === target && o.available)) {
+        return state;
+      }
+
+      return beginAction(state, action, target);
     }
 
     case "CONTINUE_SEGMENT": {

@@ -20,7 +20,7 @@ export function ItemSheet({ onClose }: { onClose: () => void }) {
   const [view, setView] = useState<View>("items");
 
   function start(actionId: string) {
-    dispatch({ type: "START_ACTION", actionId });
+    dispatch({ type: "CHOOSE_ACTION", actionId });
     onClose();
   }
 

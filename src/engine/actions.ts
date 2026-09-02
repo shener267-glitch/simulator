@@ -1,5 +1,6 @@
 import { MORNING_LENGTH, type Minutes } from "../types/clock";
 import type { Action, Segment } from "../types/action";
+import type { SegmentRun } from "../types/mode";
 import type { GameState } from "../types/game";
 import { nextVisibleAppointment } from "./schedule";
 
@@ -56,6 +57,43 @@ export function actionMinutesLeft(state: GameState, action: Action): Minutes {
   return action.segments
     .slice(resumeIndex(state, action))
     .reduce((total, segment) => total + segment.minutes, 0);
+}
+
+export interface DurationOption {
+  minutes: Minutes;
+  /** 次の予定までに入らないものは、見せるが選ばせない（設計書6章）。 */
+  available: boolean;
+}
+
+/** 一度に出す選択肢の数。多いと「どのくらい？」が計算問題になってしまう。 */
+const DURATION_CHOICES = 3;
+
+/**
+ * 「どのくらい？」の選択肢（設計書6章）。セグメントの区切りから作るので、
+ * 選んだ長さは必ず区切りの上に乗る。データに書き足す形にすると本文と
+ * ずれていくので、ここで数える。
+ *
+ * 判断の材料に使うのは visibleFreeMinutes — プレイヤーが知ってよい分だけ。
+ */
+export function durationOptions(state: GameState, action: Action): DurationOption[] {
+  const room = visibleFreeMinutes(state);
+  const options: DurationOption[] = [];
+  let total = 0;
+
+  for (const segment of action.segments.slice(resumeIndex(state, action))) {
+    total += segment.minutes;
+    options.push({ minutes: total, available: total <= room });
+    if (options.length === DURATION_CHOICES) break;
+  }
+
+  return options;
+}
+
+/** 目安に届くまであと何分か。届いていれば null。 */
+export function remainingToTarget(run: SegmentRun): Minutes | null {
+  if (run.targetMinutes === null) return null;
+  const left = run.targetMinutes - run.minutesSpent;
+  return left > 0 ? left : null;
 }
 
 /** もう出せるものがない行動。 */

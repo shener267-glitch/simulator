@@ -1,8 +1,8 @@
 import type { Action, ActionCategory } from "../../types/action";
 import { CHECK_SNS, WATCH_NEWS } from "./info";
 import { CONSULT_SAWATARI, CONSULT_SHINOZUKA, TALK_WITH_WIFE } from "./people";
-import { GIVE_INSTRUCTIONS, READ_DOCUMENTS } from "./work";
-import { EAT_BREAKFAST, GET_READY, IDLE, NAP } from "./rest";
+import { GIVE_INSTRUCTIONS, READ_DOCUMENTS, WRITE_NOTES } from "./work";
+import { EAT_BREAKFAST, GET_READY, IDLE, NAP, TAKE_SHOWER } from "./rest";
 
 /** 設計書14章の分類。 */
 export const CATEGORY_LABELS: Record<ActionCategory, string> = {
@@ -22,10 +22,12 @@ export const ACTIONS: Action[] = [
   CONSULT_SAWATARI,
   CONSULT_SHINOZUKA,
   READ_DOCUMENTS,
+  WRITE_NOTES,
   GIVE_INSTRUCTIONS,
   EAT_BREAKFAST,
   NAP,
   IDLE,
+  TAKE_SHOWER,
   GET_READY,
 ];
 

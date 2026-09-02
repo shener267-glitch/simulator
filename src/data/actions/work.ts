@@ -56,3 +56,25 @@ export const GIVE_INSTRUCTIONS: Action = {
     },
   ],
 };
+
+/** 書斎でしかできない。何も決まらないが、決めるための材料は少し整う。 */
+export const WRITE_NOTES: Action = {
+  id: "notes",
+  label: "書き物をする",
+  category: "work",
+  emoji: "🖊️",
+  places: ["study", "office"],
+  hint: "所信で何を言うか、まだ決まっていない",
+  perSegment: { fatigue: 2 },
+  segments: [
+    {
+      minutes: 10,
+      text: "机に向かい、白い紙を一枚置く。\n\n所信表明で何を言うか。日程はまだ決まっていないが、決まってから考えるのでは遅い。\n\n書き出しを三つ書いて、三つとも線を引いて消した。",
+    },
+    {
+      minutes: 10,
+      text: "言いたいことは、たぶん一つしかない。それを言うために、どれだけの前置きが要るかを考えている。\n\n四行だけ残した。まだ人に見せられる形ではない。\n\n紙を二つに折って、上着の内ポケットに入れた。",
+      highlight: "所信の書き出しを四行だけ書いた。",
+    },
+  ],
+};

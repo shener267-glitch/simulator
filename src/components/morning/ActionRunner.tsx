@@ -1,6 +1,6 @@
 import { ScreenContainer } from "../shared/ScreenContainer";
 import { PlaceHeader } from "../place/PlaceHeader";
-import { freeMinutes, visibleFreeMinutes } from "../../engine/actions";
+import { freeMinutes, remainingToTarget, visibleFreeMinutes } from "../../engine/actions";
 import { formatDuration } from "../../engine/clock";
 import { findAction } from "../../data/actions";
 import { runOf } from "../../types/mode";
@@ -25,6 +25,8 @@ export function ActionRunner() {
   // the action short should land as a surprise, not as a visible timer.
   const canContinue = !active.interrupted && !active.exhausted && nextSegment && freeMinutes(state) > 0;
   const visibleRemaining = visibleFreeMinutes(state);
+  // 選んだ長さは目安。届いたら止めずに「さらに続ける」へ変わるだけ（設計書6章・8章）。
+  const toTarget = remainingToTarget(active);
   const willBeCutShort = Boolean(nextSegment) && visibleRemaining < (nextSegment?.minutes ?? 0);
 
   return (
@@ -78,9 +80,13 @@ export function ActionRunner() {
             onClick={() => dispatch({ type: "CONTINUE_SEGMENT" })}
             className="flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-xl bg-brass px-4 text-[0.95rem] font-medium text-ink transition-colors duration-200 hover:bg-brass/90 active:bg-brass/80"
           >
-            続ける
+            {toTarget === null && active.targetMinutes !== null ? "さらに続ける" : "続ける"}
             <span className="figures text-[0.8rem] font-normal text-ink/70">
-              {willBeCutShort ? `残り${visibleRemaining}分で中断` : formatDuration(nextSegment!.minutes)}
+              {willBeCutShort
+                ? `残り${visibleRemaining}分で中断`
+                : toTarget !== null
+                  ? `あと${formatDuration(toTarget)}`
+                  : formatDuration(nextSegment!.minutes)}
             </span>
           </button>
         )}

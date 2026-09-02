@@ -34,7 +34,7 @@ export const NAP: Action = {
   repeatable: true,
   perSegment: { fatigue: -8 },
   segments: [
-    { minutes: 10, text: "ソファに身を預け、目を閉じる。眠りには落ちない。まぶたの裏が明るい。" },
+    { minutes: 10, text: "身を横たえ、目を閉じる。眠りには落ちない。まぶたの裏が明るい。" },
     { minutes: 10, text: "呼吸が深くなる。首の後ろの強張りが、少しずつほどけていく。" },
     { minutes: 10, text: "浅いところまで沈んで、また浮き上がってきた。頭の芯の重さが、いくらか抜けている。" },
   ],
@@ -53,6 +53,24 @@ export const IDLE: Action = {
     {
       minutes: 15,
       text: "何もしないでいる。\n\n窓の外で、まだ人の少ない道路を車が一台通り過ぎた。遠くで鳥が鳴いている。\n\n昨日までは一人の議員だった。今日からは違う。その事実を、うまく実感として掴めないまま、ただ座っていた。",
+    },
+  ],
+};
+
+/** 風呂でしかできない。十分で頭の芯まで起きる（設計書13章）。 */
+export const TAKE_SHOWER: Action = {
+  id: "shower",
+  label: "シャワーを浴びる",
+  category: "life",
+  emoji: "🚿",
+  places: ["bath"],
+  hint: "頭の芯まで起こす",
+  perSegment: { fatigue: -10 },
+  segments: [
+    {
+      minutes: 10,
+      text: "熱い湯を頭から浴びる。首の後ろに溜まっていたものが、少しずつ流れていく。\n\n湯気で曇った鏡を手のひらで拭った。顎の小さな切り傷が、まだ赤い。\n\n出る前に、冷たい水に切り替えて三十秒だけ立った。目の奥が、はっきりと開く。",
+      highlight: "シャワーを浴びた。",
     },
   ],
 };
