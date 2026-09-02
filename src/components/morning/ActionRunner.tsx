@@ -1,5 +1,5 @@
 import { ScreenContainer } from "../shared/ScreenContainer";
-import { MorningClock } from "./MorningClock";
+import { PlaceHeader } from "../place/PlaceHeader";
 import { freeMinutes, visibleFreeMinutes } from "../../engine/actions";
 import { formatDuration } from "../../engine/clock";
 import { findAction } from "../../data/actions";
@@ -29,7 +29,7 @@ export function ActionRunner() {
 
   return (
     <ScreenContainer width="narrow">
-      <MorningClock />
+      <PlaceHeader />
 
       <div className="flex items-baseline justify-between gap-3 border-b border-line pb-3">
         <h1 className="min-w-0 truncate text-[1.05rem] font-medium text-body">{action.label}</h1>

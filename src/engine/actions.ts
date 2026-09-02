@@ -1,5 +1,5 @@
 import { MORNING_LENGTH, type Minutes } from "../types/clock";
-import type { Segment } from "../types/action";
+import type { Action, Segment } from "../types/action";
 import type { GameState } from "../types/game";
 import { nextVisibleAppointment } from "./schedule";
 
@@ -44,4 +44,21 @@ export function visibleFreeMinutes(state: GameState): Minutes {
 
 export function segmentFits(state: GameState, segment: Segment): boolean {
   return state.clock + segment.minutes <= interruptionGuard(state);
+}
+
+/** 途中まで読んだものは、その続きから数える。 */
+export function resumeIndex(state: GameState, action: Action): number {
+  return action.repeatable ? 0 : (state.actionProgress[action.id] ?? 0);
+}
+
+/** この行動に残っている分。最後まで付き合ったときの長さ。 */
+export function actionMinutesLeft(state: GameState, action: Action): Minutes {
+  return action.segments
+    .slice(resumeIndex(state, action))
+    .reduce((total, segment) => total + segment.minutes, 0);
+}
+
+/** もう出せるものがない行動。 */
+export function isSpent(state: GameState, action: Action): boolean {
+  return state.spentActions.includes(action.id) || resumeIndex(state, action) >= action.segments.length;
 }

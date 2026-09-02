@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { applyElapsed, describeCondition, describeFatigue, describeHunger } from "../../src/engine/condition";
+import {
+  METER_CELLS,
+  applyElapsed,
+  describeCondition,
+  describeFatigue,
+  describeHunger,
+  fatigueGauge,
+  hungerGauge,
+} from "../../src/engine/condition";
 
 const DIGITS = /[0-9０-９]/;
 
@@ -28,5 +36,28 @@ describe("condition", () => {
 
   it("keeps values inside their range", () => {
     expect(applyElapsed({ fatigue: 50, hunger: 99 }, 180).hunger).toBeLessThanOrEqual(100);
+  });
+});
+
+describe("the condition meter", () => {
+  it("stays inside its five cells and never labels itself with a number", () => {
+    for (let value = 0; value <= 100; value += 1) {
+      for (const gauge of [fatigueGauge(value), hungerGauge(value)]) {
+        expect(gauge.filled).toBeGreaterThanOrEqual(1);
+        expect(gauge.filled).toBeLessThanOrEqual(METER_CELLS);
+        expect(gauge.label).not.toMatch(DIGITS);
+      }
+    }
+  });
+
+  it("fills up as the state gets worse, and never goes back on its own", () => {
+    let previous = 0;
+    for (let value = 0; value <= 100; value += 1) {
+      const { filled } = fatigueGauge(value);
+      expect(filled).toBeGreaterThanOrEqual(previous);
+      previous = filled;
+    }
+    expect(fatigueGauge(0).label).toBe("低");
+    expect(fatigueGauge(100).label).toBe("高");
   });
 });
