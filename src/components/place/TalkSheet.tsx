@@ -1,19 +1,17 @@
 import { Modal } from "../shared/Modal";
 import { SheetRow } from "../shared/SheetRow";
-import { actionMinutesLeft, isSpent } from "../../engine/actions";
-import { formatDuration } from "../../engine/clock";
-import { actionsAt } from "../../engine/places";
+import { hasSomethingLeft, talkableAt } from "../../engine/talk";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
 
 /**
- * いま話せる相手（設計書9章）。秘書官は電話なのでどこからでも、妻は台所に
- * 立っているのでリビングでしか掴まらない。
+ * いま話せる相手（設計書9章）。秘書官は電話なのでどこからでも掴まるが、
+ * 妻はリビングにしかいないし、次男は七時を過ぎないと起きてこない。
  */
 export function TalkSheet({ onClose }: { onClose: () => void }) {
   const state = useGameState();
   const dispatch = useGameDispatch();
 
-  const people = actionsAt(state.place).filter((action) => action.category === "people");
+  const people = talkableAt(state);
 
   return (
     <Modal title="話す" onClose={onClose}>
@@ -24,19 +22,20 @@ export function TalkSheet({ onClose }: { onClose: () => void }) {
           </p>
         )}
 
-        {people.map((action) => {
-          const spent = isSpent(state, action);
+        {people.map((tree) => {
+          // どの枝にも残っていなければ、もう話すことはない。
+          const empty = !tree.nodes.some((node) => hasSomethingLeft(state, tree, node.id));
 
           return (
             <SheetRow
-              key={action.id}
-              emoji={action.emoji}
-              label={action.label}
-              note={spent ? "いまは話すことがない" : action.hint}
-              meta={spent ? "済んだ" : formatDuration(actionMinutesLeft(state, action))}
-              disabled={spent}
+              key={tree.id}
+              emoji={tree.emoji}
+              label={tree.label}
+              note={empty ? "いまは話すことがない" : tree.hint}
+              meta={tree.channel === "phone" ? "電話" : "対面"}
+              disabled={empty}
               onClick={() => {
-                dispatch({ type: "CHOOSE_ACTION", actionId: action.id });
+                dispatch({ type: "OPEN_TALK", treeId: tree.id });
                 onClose();
               }}
             />

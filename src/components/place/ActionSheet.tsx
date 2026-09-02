@@ -13,7 +13,7 @@ export function ActionSheet({ onClose }: { onClose: () => void }) {
   const state = useGameState();
   const dispatch = useGameDispatch();
 
-  const actions = actionsAt(state.place).filter((action) => action.category !== "people");
+  const actions = actionsAt(state.place);
 
   return (
     <Modal title="行動" onClose={onClose}>

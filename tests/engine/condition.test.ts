@@ -28,10 +28,12 @@ describe("condition", () => {
     expect(describeFatigue(50)).not.toBe(describeFatigue(90));
   });
 
-  it("lets hunger creep up with the passing minutes", () => {
+  it("wears the player down just by the morning passing", () => {
     const after = applyElapsed({ fatigue: 50, hunger: 40 }, 30);
     expect(after.hunger).toBeGreaterThan(40);
-    expect(after.fatigue).toBe(50);
+    expect(after.fatigue).toBeGreaterThan(50);
+    // 空腹のほうが速く来る。腹は三時間で確実に減るが、疲労はそこまで急には来ない。
+    expect(after.hunger - 40).toBeGreaterThan(after.fatigue - 50);
   });
 
   it("keeps values inside their range", () => {

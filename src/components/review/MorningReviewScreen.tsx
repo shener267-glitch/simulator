@@ -1,7 +1,9 @@
 import { ScreenContainer } from "../shared/ScreenContainer";
+import { ConditionMeter } from "../shared/ConditionMeter";
 import { formatClock, formatDuration } from "../../engine/clock";
-import { describeCondition } from "../../engine/condition";
+import { describeCondition, fatigueGauge, hungerGauge } from "../../engine/condition";
 import { MORNING_DATE_STAMP } from "../../data/briefing";
+import { describeTendency } from "../../data/tendencies";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
 
 /**
@@ -12,6 +14,7 @@ export function MorningReviewScreen() {
   const state = useGameState();
   const dispatch = useGameDispatch();
   const total = state.log.reduce((sum, entry) => sum + entry.minutes, 0);
+  const tendency = describeTendency(state.flags);
 
   return (
     <ScreenContainer width="narrow">
@@ -75,18 +78,39 @@ export function MorningReviewScreen() {
           <h2 className="text-[0.72rem] font-medium tracking-[0.2em] text-body-muted">いまの状態</h2>
           <span className="h-px flex-1 bg-line" />
         </div>
-        <div className="flex flex-col gap-2 rounded-2xl border border-line bg-ink-panel px-5 py-4">
-          {describeCondition(state.condition).map((line) => (
-            <p key={line} className="text-[0.9rem] leading-[1.95] text-body">
-              {line}
-            </p>
-          ))}
+        <div className="rounded-2xl border border-line bg-ink-panel px-5 py-4">
+          <div className="flex flex-col gap-2.5">
+            <ConditionMeter label="疲労" gauge={fatigueGauge(state.condition.fatigue)} />
+            <ConditionMeter label="空腹" gauge={hungerGauge(state.condition.hunger)} />
+          </div>
+
+          <div className="mt-4 flex flex-col gap-2 border-t border-line pt-3.5">
+            {describeCondition(state.condition).map((line) => (
+              <p key={line} className="text-[0.9rem] leading-[1.95] text-body">
+                {line}
+              </p>
+            ))}
+          </div>
         </div>
       </section>
 
+      {tendency && (
+        <section className="flex flex-col gap-2.5">
+          <div className="flex items-center gap-3">
+            <h2 className="text-[0.72rem] font-medium tracking-[0.2em] text-body-muted">
+              この朝の過ごし方
+            </h2>
+            <span className="h-px flex-1 bg-line" />
+          </div>
+          <p className="rounded-2xl border border-line bg-ink-panel px-5 py-4 text-[0.9rem] leading-[1.95] text-body">
+            {tendency}
+          </p>
+        </section>
+      )}
+
       <div className="mt-1 rounded-2xl border border-line/60 px-5 py-4 text-[0.82rem] leading-[1.9] text-body-faint">
-        <p>v0.1ではここまで。</p>
-        <p>午前フェーズは今後のバージョンで実装予定。</p>
+        <p>v0.2ではここまで。</p>
+        <p>午前以降のフェーズは今後のバージョンで実装予定。</p>
       </div>
 
       <button

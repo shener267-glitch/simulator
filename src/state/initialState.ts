@@ -39,5 +39,6 @@ export function createInitialState(player?: GameState["player"]): GameState {
     flags: [],
     spentActions: [],
     actionProgress: {},
+    talkProgress: {},
   };
 }

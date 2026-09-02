@@ -1,29 +1,26 @@
 import type { Action, ActionCategory } from "../../types/action";
 import { CHECK_SNS, WATCH_NEWS } from "./info";
-import { CONSULT_SAWATARI, CONSULT_SHINOZUKA, TALK_WITH_WIFE } from "./people";
-import { GIVE_INSTRUCTIONS, READ_DOCUMENTS, WRITE_NOTES } from "./work";
+import { READ_DOCUMENTS, WRITE_NOTES } from "./work";
 import { EAT_BREAKFAST, GET_READY, IDLE, NAP, TAKE_SHOWER } from "./rest";
 
-/** 設計書14章の分類。 */
+/**
+ * 設計書14章の分類。人と話すことは「行動」ではなく「話す」に移したので、
+ * ここに人間関係の枠はない（設計書4章・9章）。
+ */
 export const CATEGORY_LABELS: Record<ActionCategory, string> = {
   info: "情報",
-  people: "人間関係",
   work: "仕事",
   rest: "休息",
   life: "私生活",
 };
 
-export const CATEGORY_ORDER: ActionCategory[] = ["info", "people", "work", "rest", "life"];
+export const CATEGORY_ORDER: ActionCategory[] = ["info", "work", "rest", "life"];
 
 export const ACTIONS: Action[] = [
   WATCH_NEWS,
   CHECK_SNS,
-  TALK_WITH_WIFE,
-  CONSULT_SAWATARI,
-  CONSULT_SHINOZUKA,
   READ_DOCUMENTS,
   WRITE_NOTES,
-  GIVE_INSTRUCTIONS,
   EAT_BREAKFAST,
   NAP,
   IDLE,

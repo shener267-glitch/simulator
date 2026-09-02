@@ -8,7 +8,10 @@ import { isMorningOver } from "../engine/clock";
 import { applyElapsed, clampCondition } from "../engine/condition";
 import { travelMinutes } from "../engine/places";
 import { dueAppointment, dueInterrupt, moveAppointment } from "../engine/schedule";
+import { choicesAt, talkableAt } from "../engine/talk";
+import { nodeOf, choiceOf } from "../types/talk";
 import { placeById } from "../data/places";
+import { findTree } from "../data/talk";
 import { findAction } from "../data/actions";
 import { createInitialState } from "./initialState";
 
@@ -30,6 +33,18 @@ export type GameAction =
   | { type: "START_ACTION"; actionId: string; targetMinutes?: Minutes }
   | { type: "CONTINUE_SEGMENT" }
   | { type: "STOP_ACTION" }
+  /** 相手を選ぶ。時間は使わない。 */
+  | { type: "OPEN_TALK"; treeId: string }
+  /** 「指示を出す」「相談する」など、枝を移る。時間は使わない。 */
+  | { type: "TALK_GOTO"; nodeId: string }
+  /** 話題を選ぶ。返事の分だけ時間を使う。 */
+  | { type: "TALK_CHOOSE"; choiceId: string }
+  /** 返事を読み終えて話題の一覧に戻る。 */
+  | { type: "TALK_BACK" }
+  /** 切る。会話全体を一行にしてログに残す。 */
+  | { type: "END_TALK" }
+  /** 後回しにした連絡を読む。読むにも時間はかかる。 */
+  | { type: "READ_MESSAGE"; messageId: string }
   | { type: "RESTART_MORNING" }
   | { type: "NEW_GAME" };
 
@@ -42,6 +57,8 @@ interface Script {
   segments: Segment[];
   perSegment?: ConditionDelta;
   repeatable?: boolean;
+  /** false のものは run ごとにはログを書かない。会話は END_TALK でまとめる。 */
+  logged: boolean;
 }
 
 function scriptOf(action: FreeAction): Script {
@@ -50,12 +67,20 @@ function scriptOf(action: FreeAction): Script {
     segments: action.segments,
     perSegment: action.perSegment,
     repeatable: action.repeatable,
+    logged: true,
   };
 }
 
 function scriptFor(source: SegmentSource): Script | null {
-  const action = findAction(source.actionId);
-  return action ? scriptOf(action) : null;
+  if (source.kind === "action") {
+    const action = findAction(source.actionId);
+    return action ? scriptOf(action) : null;
+  }
+
+  const tree = findTree(source.treeId);
+  const choice = tree && choiceOf(tree, source.choiceId);
+  if (!choice || choice.kind !== "topic") return null;
+  return { label: tree.short, segments: [choice.reply], logged: false };
 }
 
 /** 続けて歩いた一分は一行にまとめる。廊下を抜けた記録が並ぶと読みにくい。 */
@@ -152,21 +177,22 @@ function consumeSegment(state: GameState, script: Script, run: SegmentRun): Game
 
   const segmentIndex = fits ? run.segmentIndex + 1 : run.segmentIndex;
 
+  const advanced: SegmentRun = {
+    ...run,
+    segmentIndex,
+    minutesSpent: run.minutesSpent + spent,
+    interrupted: !fits,
+    exhausted: fits && segmentIndex >= script.segments.length,
+  };
+
   const next: GameState = {
     ...state,
     clock: state.clock + spent,
     condition,
     highlights: fits && segment.highlight ? [...state.highlights, segment.highlight] : state.highlights,
-    mode: {
-      kind: "action",
-      run: {
-        ...run,
-        segmentIndex,
-        minutesSpent: run.minutesSpent + spent,
-        interrupted: !fits,
-        exhausted: fits && segmentIndex >= script.segments.length,
-      },
-    },
+    flags: fits ? addFlags(state.flags, segment.flags) : state.flags,
+    // 会話の中で走らせているなら会話の画面のまま。それ以外は行動の画面。
+    mode: state.mode.kind === "talk" ? { ...state.mode, run: advanced } : { kind: "action", run: advanced },
   };
 
   // 切れ目に着いたときだけ連絡が鳴る。予定に切られた回は鳴らさない —
@@ -178,6 +204,8 @@ function consumeSegment(state: GameState, script: Script, run: SegmentRun): Game
 function recordRun(state: GameState, run: SegmentRun): GameState {
   const script = scriptFor(run.source);
   if (!script) return state;
+  // 会話の返事は、一区切りごとではなく会話ごとに一行にする。
+  if (run.source.kind !== "action") return state;
 
   const actionId = run.source.actionId;
   const spent = run.minutesSpent;
@@ -186,7 +214,7 @@ function recordRun(state: GameState, run: SegmentRun): GameState {
   return {
     ...state,
     log:
-      spent > 0
+      script.logged && spent > 0
         ? [...state.log, { label: script.label, minutes: spent, startedAt: run.startedAt }]
         : state.log,
     spentActions:
@@ -223,6 +251,28 @@ function beginAction(state: GameState, action: FreeAction, target: Minutes | nul
 function finishRun(state: GameState): GameState {
   if (state.mode.kind !== "action") return state;
   return settle({ ...recordRun(state, state.mode.run), mode: { kind: "place" } });
+}
+
+/**
+ * 会話はひと続きで一行にする。話題ごとに「沢渡 10分」が並ぶより、
+ * 「沢渡と話した 30分」のほうが、あとから読んで朝の形が見える。
+ */
+function recordTalk(state: GameState): GameState {
+  if (state.mode.kind !== "talk") return state;
+  const mode = state.mode;
+  const tree = findTree(mode.treeId);
+  const spent = mode.minutesSpent + (mode.run?.minutesSpent ?? 0);
+  if (!tree || spent <= 0) return state;
+
+  return {
+    ...state,
+    log: [...state.log, { label: `${tree.short}と話した`, minutes: spent, startedAt: mode.startedAt }],
+  };
+}
+
+function endTalk(state: GameState): GameState {
+  if (state.mode.kind !== "talk") return state;
+  return settle({ ...recordTalk(state), mode: { kind: "place" } });
 }
 
 export function gameReducer(state: GameState, gameAction: GameAction): GameState {
@@ -264,10 +314,13 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
 
       if (choice === "answer") {
         // 手を止めて出る。走っていた行動はここで終わり、使った分が記録される。
+        // 走っていたものはここで終わる。使った分は取りこぼさずに記録する。
         const closed =
           mode.resume.kind === "action"
             ? recordRun({ ...marked, mode: mode.resume }, mode.resume.run)
-            : marked;
+            : mode.resume.kind === "talk"
+              ? recordTalk({ ...marked, mode: mode.resume })
+              : marked;
 
         const room = interruptionGuard(closed) - closed.clock;
         const spent = Math.max(0, Math.min(interrupt.minutes, room));
@@ -298,6 +351,8 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
                 from: interrupt.message.from,
                 at: marked.clock,
                 body: interrupt.message.body,
+                minutes: interrupt.message.minutes,
+                flags: interrupt.message.flags,
                 read: false,
               },
             ]
@@ -381,6 +436,111 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
 
     case "STOP_ACTION":
       return finishRun(state);
+
+    case "OPEN_TALK": {
+      if (state.mode.kind !== "place") return state;
+      const tree = talkableAt(state).find((candidate) => candidate.id === gameAction.treeId);
+      if (!tree) return state;
+
+      return {
+        ...state,
+        mode: {
+          kind: "talk",
+          treeId: tree.id,
+          nodeId: tree.rootId,
+          startedAt: state.clock,
+          minutesSpent: 0,
+          run: null,
+        },
+      };
+    }
+
+    case "TALK_GOTO": {
+      if (state.mode.kind !== "talk" || state.mode.run) return state;
+      const tree = findTree(state.mode.treeId);
+      if (!tree || !nodeOf(tree, gameAction.nodeId)) return state;
+      return { ...state, mode: { ...state.mode, nodeId: gameAction.nodeId } };
+    }
+
+    case "TALK_CHOOSE": {
+      if (state.mode.kind !== "talk" || state.mode.run) return state;
+      const mode = state.mode;
+      const tree = findTree(mode.treeId);
+      const node = tree && nodeOf(tree, mode.nodeId);
+      if (!tree || !node) return state;
+
+      const choice = choicesAt(state, tree, node).find(
+        (candidate) => candidate.id === gameAction.choiceId,
+      );
+      if (!choice || choice.kind !== "topic") return state;
+
+      // 一度きりの話題は選んだ時点で使い切る。予定に切られた話題を選び直せると、
+      // 時間を払わずに同じ返事を引けてしまう。
+      const used = state.talkProgress[tree.id] ?? [];
+      const marked: GameState = {
+        ...state,
+        flags: addFlags(state.flags, choice.flags),
+        talkProgress: choice.once
+          ? { ...state.talkProgress, [tree.id]: [...used, choice.id] }
+          : state.talkProgress,
+      };
+
+      return consumeSegment(marked, { label: tree.short, segments: [choice.reply], logged: false }, {
+        source: { kind: "talk", treeId: tree.id, choiceId: choice.id },
+        segmentIndex: 0,
+        minutesSpent: 0,
+        startedAt: marked.clock,
+        targetMinutes: null,
+        interrupted: false,
+        exhausted: false,
+      });
+    }
+
+    case "TALK_BACK": {
+      if (state.mode.kind !== "talk") return state;
+      const mode = state.mode;
+      const finished = mode.run;
+      if (!finished) return state;
+
+      const folded = { ...mode, minutesSpent: mode.minutesSpent + finished.minutesSpent, run: null };
+
+      // 予定に切られたなら、そこで話は終わり。
+      if (finished.interrupted) return endTalk({ ...state, mode: folded });
+      return { ...state, mode: folded };
+    }
+
+    case "END_TALK":
+      return endTalk(state);
+
+    case "READ_MESSAGE": {
+      if (state.mode.kind !== "place") return state;
+      const message = state.phone.messages.find(
+        (candidate) => candidate.id === gameAction.messageId,
+      );
+      if (!message || message.read) return state;
+
+      const room = interruptionGuard(state) - state.clock;
+      const spent = Math.max(0, Math.min(message.minutes, room));
+
+      return settle({
+        ...state,
+        clock: state.clock + spent,
+        condition: applyElapsed(state.condition, spent),
+        flags: addFlags(state.flags, message.flags),
+        phone: {
+          messages: state.phone.messages.map((candidate) =>
+            candidate.id === message.id ? { ...candidate, read: true } : candidate,
+          ),
+        },
+        log:
+          spent > 0
+            ? [
+                ...state.log,
+                { label: `${message.from}からのメッセージ`, minutes: spent, startedAt: state.clock },
+              ]
+            : state.log,
+      });
+    }
 
     case "RESTART_MORNING":
       return createInitialState(state.player);

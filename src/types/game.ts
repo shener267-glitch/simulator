@@ -55,8 +55,8 @@ export interface SoftInterrupt {
   body: string[];
   /** 出た場合に使う分。 */
   minutes: Minutes;
-  /** 後回し・無視したときに電話へ残る中身。あとから読める。 */
-  message: { from: string; body: string[] };
+  /** 後回しにしたときに電話へ残る中身。あとから、時間を使って読める。 */
+  message: { from: string; body: string[]; minutes: Minutes; flags?: string[] };
   /**
    * どう答えても起きる予定変更。世界の側の動きであって、プレイヤーの
    * 選択で止まるものではない。
@@ -73,13 +73,19 @@ export interface SoftInterrupt {
   answeredWith: InterruptChoice | null;
 }
 
-/** 電話に残っているもの。後回しにした連絡はここに落ちる。 */
+/**
+ * 電話に残っているもの。後回しにした連絡はここに落ちる。読むにも時間は
+ * かかる — 後回しは時間を先送りする手であって、ただにする手ではない。
+ */
 export interface PhoneMessage {
   id: string;
   from: string;
   at: Minutes;
   body: string[];
+  minutes: Minutes;
   read: boolean;
+  /** 読んで初めて知ることになる（設計書27章）。 */
+  flags?: string[];
 }
 
 /** What the player did and how long it took — the morning review reads this. */
@@ -120,4 +126,6 @@ export interface GameState {
   spentActions: string[];
   /** How far into each action the player has read, so returning to it resumes. */
   actionProgress: Record<string, number>;
+  /** 相手ごとに、もう聞いてしまった話題。会話を抜けても朝の終わりまで残る。 */
+  talkProgress: Record<string, string[]>;
 }

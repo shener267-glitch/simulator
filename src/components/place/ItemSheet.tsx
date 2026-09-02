@@ -108,28 +108,43 @@ export function ItemSheet({ onClose }: { onClose: () => void }) {
           </p>
         ) : (
           <div className="flex flex-col gap-3">
-            {messages.map((message) => (
-              <article
-                key={message.id}
-                className="rounded-xl border border-line bg-ink-panel px-4 py-3.5"
-              >
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-[0.8rem] font-medium tracking-wider text-brass">
-                    {message.from}
-                  </span>
-                  <span className="figures shrink-0 text-[0.75rem] text-body-muted">
-                    {formatClock(message.at)}
-                  </span>
-                </div>
-                <div className="mt-2.5 flex flex-col gap-2">
-                  {message.body.map((line) => (
-                    <p key={line} className="text-[0.86rem] leading-[1.9] text-body-muted">
-                      {line}
-                    </p>
-                  ))}
-                </div>
-              </article>
-            ))}
+            {messages.map((message) =>
+              message.read ? (
+                <article
+                  key={message.id}
+                  className="rounded-xl border border-line bg-ink-panel px-4 py-3.5"
+                >
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-[0.8rem] font-medium tracking-wider text-brass">
+                      {message.from}
+                    </span>
+                    <span className="figures shrink-0 text-[0.75rem] text-body-muted">
+                      {formatClock(message.at)}
+                    </span>
+                  </div>
+                  <div className="mt-2.5 flex flex-col gap-2">
+                    {message.body.map((line) => (
+                      <p key={line} className="text-[0.86rem] leading-[1.9] text-body-muted">
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                </article>
+              ) : (
+                // 後回しにしたものは、読むのにも時間がかかる。
+                <SheetRow
+                  key={message.id}
+                  emoji="✉️"
+                  label={message.from}
+                  note={`${formatClock(message.at)}　未読`}
+                  meta={formatDuration(message.minutes)}
+                  onClick={() => {
+                    dispatch({ type: "READ_MESSAGE", messageId: message.id });
+                    onClose();
+                  }}
+                />
+              ),
+            )}
           </div>
         )}
         <BackRow onBack={() => setView("phone")} />

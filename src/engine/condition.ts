@@ -71,10 +71,14 @@ export function clampCondition(condition: Condition): Condition {
   return { fatigue: clamp(condition.fatigue), hunger: clamp(condition.hunger) };
 }
 
-/** Hunger creeps up as the morning passes, a little every ten minutes. */
+/**
+ * 時間が経つだけで消耗する（設計書24章）。起きているかぎり疲労は少しずつ
+ * 積もり、空腹はそれより速く来る。仮眠・シャワー・朝食で戻せるが、戻すには
+ * 時間を使う。生活を削れば今の時間は増えて、あとで返すことになる。
+ */
 export function applyElapsed(condition: Condition, minutes: number): Condition {
   return clampCondition({
-    fatigue: condition.fatigue,
+    fatigue: condition.fatigue + minutes * 0.04,
     hunger: condition.hunger + minutes * 0.1,
   });
 }

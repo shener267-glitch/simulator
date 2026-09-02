@@ -1,7 +1,7 @@
 import type { Minutes } from "./clock";
 import type { PlaceId } from "./place";
 
-export type ActionCategory = "info" | "people" | "work" | "rest" | "life";
+export type ActionCategory = "info" | "work" | "rest" | "life";
 
 /**
  * One stretch of an action. Actions are split into segments so the player can
@@ -17,6 +17,8 @@ export interface Segment {
   lines?: string[];
   /** Recorded in the morning's highlights when this segment is consumed. */
   highlight?: string;
+  /** 読んだことで積む性格フラグ、あるいは知ってしまった事実（設計書27章・28章）。 */
+  flags?: string[];
 }
 
 export interface ConditionDelta {

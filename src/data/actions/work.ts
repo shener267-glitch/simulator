@@ -1,6 +1,4 @@
 import type { Action } from "../../types/action";
-import { ANYWHERE } from "../places";
-import { SAWATARI, SHINOZUKA } from "../characters";
 
 export const READ_DOCUMENTS: Action = {
   id: "documents",
@@ -40,24 +38,6 @@ export const READ_DOCUMENTS: Action = {
   ],
 };
 
-export const GIVE_INSTRUCTIONS: Action = {
-  id: "instructions",
-  label: "秘書官に指示を出す",
-  category: "work",
-  emoji: "📋",
-  places: ANYWHERE,
-  hint: "調整、根回し、情報収集を頼む",
-  perSegment: { fatigue: 1 },
-  segments: [
-    {
-      minutes: 10,
-      text: `${SAWATARI.shortName}と${SHINOZUKA.shortName}に、いくつか頼んでおく。\n\n${SAWATARI.shortName}には党内で先に声をかけておくべき相手の整理を、${SHINOZUKA.shortName}には閣僚の身辺について確認できる範囲での資料を。\n\n二人とも、余計なことは聞かなかった。`,
-      highlight: "秘書官に党内調整と資料の追加確認を指示した。",
-    },
-  ],
-};
-
-/** 書斎でしかできない。何も決まらないが、決めるための材料は少し整う。 */
 export const WRITE_NOTES: Action = {
   id: "notes",
   label: "書き物をする",

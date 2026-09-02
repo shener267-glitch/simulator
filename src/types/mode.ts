@@ -5,7 +5,10 @@ import type { Minutes } from "./clock";
  * ニュースも同じ機構に乗せるつもりで union にしてある — 中断のルールが
  * 一箇所にしかない状態を保つため（設計書13章・19章）。
  */
-export type SegmentSource = { kind: "action"; actionId: string };
+export type SegmentSource =
+  | { kind: "action"; actionId: string }
+  /** 会話の返事。行動と同じ機構で走らせて、中断のルールを一本に保つ。 */
+  | { kind: "talk"; treeId: string; choiceId: string };
 
 /** セグメントを一つずつ消化している最中の状態。 */
 export interface SegmentRun {
@@ -35,6 +38,18 @@ export type RestingMode =
   /** 「どのくらい？」を聞いている最中。まだ時間は動いていない（設計書6章）。 */
   | { kind: "duration"; actionId: string }
   | { kind: "action"; run: SegmentRun }
+  /**
+   * 人と話している最中。話題を選んでいるときは run が null、返事を読んで
+   * いるときだけ入る。ログは会話ごとに一行なので、合計はここで数える。
+   */
+  | {
+      kind: "talk";
+      treeId: string;
+      nodeId: string;
+      startedAt: Minutes;
+      minutesSpent: Minutes;
+      run: SegmentRun | null;
+    }
   | { kind: "appointment"; appointmentId: string };
 
 /**
@@ -56,7 +71,7 @@ export type Mode =
 
 /** いま走っている run。走っていなければ null。 */
 export function runOf(mode: Mode): SegmentRun | null {
-  if (mode.kind === "action") return mode.run;
-  if (mode.kind === "interrupt" && mode.resume.kind === "action") return mode.resume.run;
+  if (mode.kind === "action" || mode.kind === "talk") return mode.run;
+  if (mode.kind === "interrupt") return runOf(mode.resume);
   return null;
 }

@@ -3,6 +3,8 @@ import { gameReducer } from "../../src/state/gameReducer";
 import { createInitialState } from "../../src/state/initialState";
 import { durationOptions, remainingToTarget } from "../../src/engine/actions";
 import { actionsAt } from "../../src/engine/places";
+import { choicesAt, talkableAt } from "../../src/engine/talk";
+import { findTree } from "../../src/data/talk";
 import { findAction } from "../../src/data/actions";
 import {
   at,
@@ -375,6 +377,126 @@ describe("the call that arrives on its own", () => {
 
     expect(state.interrupts.every((item) => item.fired)).toBe(true);
     expect(state.mode.kind).not.toBe("interrupt");
+  });
+});
+
+describe("talking to people", () => {
+  it("only offers whoever is actually within reach", () => {
+    // 秘書官は電話、妻はリビング、次男は07:00を過ぎてから。
+    expect(talkableAt(awake()).map((tree) => tree.id)).toEqual(["sawatari", "shinozuka"]);
+    expect(talkableAt(at(awake(), "living")).map((tree) => tree.id)).toContain("wife");
+    expect(talkableAt(at(awake(), "living")).map((tree) => tree.id)).not.toContain("son");
+
+    const later = { ...at(awake(), "living"), clock: 125 };
+    expect(talkableAt(later).map((tree) => tree.id)).toContain("son");
+  });
+
+  it("writes one row for the whole conversation, not one per topic", () => {
+    const after = run(
+      awake(),
+      { type: "OPEN_TALK", treeId: "sawatari" },
+      { type: "TALK_GOTO", nodeId: "consult" },
+      { type: "TALK_CHOOSE", choiceId: "consult-party" },
+      { type: "TALK_BACK" },
+      { type: "TALK_CHOOSE", choiceId: "consult-me" },
+      { type: "TALK_BACK" },
+      { type: "END_TALK" },
+    );
+
+    expect(after.clock).toBe(20);
+    expect(after.log).toEqual([{ label: "沢渡と話した", minutes: 20, startedAt: 0 }]);
+  });
+
+  it("will not let the same question be asked twice", () => {
+    const asked = run(
+      awake(),
+      { type: "OPEN_TALK", treeId: "sawatari" },
+      { type: "TALK_GOTO", nodeId: "consult" },
+      { type: "TALK_CHOOSE", choiceId: "consult-party" },
+      { type: "TALK_BACK" },
+    );
+
+    expect(asked.talkProgress.sawatari).toContain("consult-party");
+
+    const again = gameReducer(asked, { type: "TALK_CHOOSE", choiceId: "consult-party" });
+    expect(again.clock).toBe(asked.clock);
+    expect(again.mode).toEqual(asked.mode);
+  });
+
+  it("keeps a topic out of reach until the player knows enough to ask it", () => {
+    // 設計書27章。朝刊のベタ記事に気づいて初めて、沢渡に振れる話題が増える。
+    const tree = findTree("sawatari")!;
+    const consult = tree.nodes.find((node) => node.id === "consult")!;
+
+    const before = awake();
+    expect(choicesAt(before, tree, consult).map((choice) => choice.id)).not.toContain(
+      "consult-report",
+    );
+
+    const informed = { ...before, flags: ["knows-about-report"] };
+    expect(choicesAt(informed, tree, consult).map((choice) => choice.id)).toContain(
+      "consult-report",
+    );
+  });
+
+  it("opens that topic up by reading the morning paper all the way through", () => {
+    const read = playThrough(awake(), "news");
+    expect(read.flags).toContain("knows-about-report");
+  });
+
+  it("ends the conversation when an appointment cuts a reply short", () => {
+    // 06:55。ブリーフィングまで5分しかないところに10分の返事。
+    const state = run(
+      { ...withoutCall(awake()), clock: 115 },
+      { type: "OPEN_TALK", treeId: "shinozuka" },
+      { type: "TALK_GOTO", nodeId: "consult" },
+      { type: "TALK_CHOOSE", choiceId: "consult-opinion" },
+    );
+
+    expect(state.clock).toBe(120);
+    expect(currentRun(state)?.interrupted).toBe(true);
+
+    const after = gameReducer(state, { type: "TALK_BACK" });
+    expect(after.log[after.log.length - 1]).toEqual({
+      label: "篠塚と話した",
+      minutes: 5,
+      startedAt: 115,
+    });
+    expect(after.mode).toMatchObject({ kind: "appointment", appointmentId: "briefing" });
+  });
+});
+
+describe("reading what was put off", () => {
+  it("charges for reading it, so putting it off is not a free way to hear it", () => {
+    let state = playThrough(awake(), "documents"); // 30分
+    state = playThrough(state, "ready"); // 20分
+    state = playThrough(state, "idle"); // 15分 → 06:05
+    state = gameReducer(state, { type: "START_ACTION", actionId: "news" }); // 着信
+    state = gameReducer(state, { type: "ANSWER_INTERRUPT", choice: "defer" });
+    state = gameReducer(state, { type: "STOP_ACTION" });
+
+    expect(state.flags).not.toContain("knows-about-report");
+    const before = state.clock;
+
+    state = gameReducer(state, { type: "READ_MESSAGE", messageId: "funding-report" });
+
+    expect(state.clock).toBe(before + 5);
+    expect(state.flags).toContain("knows-about-report");
+    expect(state.phone.messages[0].read).toBe(true);
+    expect(state.log[state.log.length - 1].label).toBe("官房長官からのメッセージ");
+  });
+
+  it("does not read the same message twice", () => {
+    let state = playThrough(awake(), "documents");
+    state = playThrough(state, "ready");
+    state = playThrough(state, "idle");
+    state = gameReducer(state, { type: "START_ACTION", actionId: "news" });
+    state = gameReducer(state, { type: "ANSWER_INTERRUPT", choice: "defer" });
+    state = gameReducer(state, { type: "STOP_ACTION" });
+    state = gameReducer(state, { type: "READ_MESSAGE", messageId: "funding-report" });
+
+    const again = gameReducer(state, { type: "READ_MESSAGE", messageId: "funding-report" });
+    expect(again.clock).toBe(state.clock);
   });
 });
 

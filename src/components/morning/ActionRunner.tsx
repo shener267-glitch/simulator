@@ -13,8 +13,9 @@ import { useGameDispatch, useGameState } from "../../state/GameContext";
 export function ActionRunner() {
   const state = useGameState();
   const dispatch = useGameDispatch();
-  const active = runOf(state.mode);
-  const action = active ? findAction(active.source.actionId) : undefined;
+  const active = state.mode.kind === "action" ? state.mode.run : runOf(state.mode);
+  const action =
+    active && active.source.kind === "action" ? findAction(active.source.actionId) : undefined;
   if (!active || !action) return null;
 
   const shownIndex = active.interrupted ? active.segmentIndex : active.segmentIndex - 1;

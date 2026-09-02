@@ -28,6 +28,8 @@ export const MORNING_CALL: SoftInterrupt = {
   ],
   message: {
     from: "官房長官",
+    minutes: 5,
+    flags: ["knows-about-report"],
     body: [
       "朝早くに失礼しました。お手が離せなかったようですので、要点だけ。",
       "国土交通大臣の資金管理団体で、政治資金収支報告書の記載漏れが報じられています。額は小さく、訂正で済む筋のものと本人は説明しているとのことです。",
@@ -41,7 +43,7 @@ export const MORNING_CALL: SoftInterrupt = {
     note: "沢渡がブリーフィングを06:30に繰り上げた。",
   },
   flags: {
-    answer: ["answered-the-call"],
+    answer: ["answered-the-call", "knows-about-report"],
     defer: ["deferred-the-call"],
     ignore: ["ignored-the-call"],
   },

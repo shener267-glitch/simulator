@@ -20,7 +20,6 @@ export function MoveSheet({ onClose }: { onClose: () => void }) {
           // 何ができる場所なのかを一行で見せておく。移動そのものが目的では
           // ないので、行き先を決める材料は手前に出す。
           const offers = actionsAt(place.id)
-            .filter((action) => action.category !== "people")
             .slice(0, 3)
             .map((action) => action.label)
             .join("・");

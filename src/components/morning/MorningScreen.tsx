@@ -1,4 +1,5 @@
 import { PlaceScreen } from "../place/PlaceScreen";
+import { TalkRunner } from "../talk/TalkRunner";
 import { ActionRunner } from "./ActionRunner";
 import { AppointmentScreen } from "./AppointmentScreen";
 import { BriefingScreen } from "./BriefingScreen";
@@ -13,6 +14,8 @@ function Base({ mode }: { mode: RestingMode }) {
       return <WakeScene />;
     case "action":
       return <ActionRunner />;
+    case "talk":
+      return <TalkRunner />;
     // ブリーフィングだけは日程表を出すので、専用の画面を持っている。
     case "appointment":
       return mode.appointmentId === "briefing" ? <BriefingScreen /> : <AppointmentScreen />;
