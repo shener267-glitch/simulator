@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { reviewBlocks, TIME_BLOCKS } from "../../src/engine/review";
-import { awake } from "../testUtils";
+import { at, awake, playThrough, resolved, withoutCall } from "../testUtils";
+import { gameReducer } from "../../src/state/gameReducer";
 import type { GameState } from "../../src/types/game";
 
 function logged(entries: { label: string; minutes: number; startedAt: number }[]): GameState {
@@ -45,5 +46,34 @@ describe("一日の記録", () => {
     ]);
 
     expect(reviewBlocks(state).map((block) => block.minutes)).toEqual([60, 40]);
+  });
+});
+
+/** 21:00、宿舎のリビング。予定は全部済んでいる。 */
+function tonight(): GameState {
+  const base = withoutCall(at(awake(), "living"));
+  return resolved(base, ...base.appointments.map((appointment) => appointment.id));
+}
+
+describe("記録のまとめ方", () => {
+  it("folds a repeated action into one row instead of twenty", () => {
+    // 何度でもできる行動を続けると、同じ行が並んで記録が読めなくなる。
+    let state = { ...tonight(), clock: 900 };
+    for (let i = 0; i < 4; i += 1) state = playThrough(state, "idle");
+
+    const idle = state.log.filter((entry) => entry.label === "少しぼーっとする");
+    expect(idle).toHaveLength(1);
+    expect(idle[0].minutes).toBe(60);
+    expect(idle[0].startedAt).toBe(900);
+  });
+
+  it("starts a new row when something else happened in between", () => {
+    let state = { ...tonight(), clock: 900 };
+    state = playThrough(state, "idle");
+    state = gameReducer(state, { type: "MOVE_TO", place: "corridor" });
+    state = gameReducer(state, { type: "MOVE_TO", place: "living" });
+    state = playThrough(state, "idle");
+
+    expect(state.log.filter((entry) => entry.label === "少しぼーっとする")).toHaveLength(2);
   });
 });

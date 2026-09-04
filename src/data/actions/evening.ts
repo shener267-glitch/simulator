@@ -70,7 +70,6 @@ export const EVENING_NEWS: Action = {
   places: ["living", "study"],
   hint: "今日の自分が、どう映ったか",
   from: EVENING,
-  repeatable: true,
   perSegment: { fatigue: 2 },
   segments: [
     {
@@ -135,7 +134,6 @@ export const SIT_WITH_FAMILY: Action = {
   places: ["living"],
   hint: "話さなくてもいい",
   from: EVENING,
-  repeatable: true,
   perSegment: { fatigue: -3 },
   segments: [
     {

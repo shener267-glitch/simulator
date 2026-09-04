@@ -76,7 +76,6 @@ export const CHECK_PRESS: Action = {
   places: ["secretariat"],
   hint: "秘書官室の机に、切り抜きが積んである",
   until: LEAVES,
-  repeatable: true,
   perSegment: { fatigue: 1 },
   segments: [
     {
@@ -98,7 +97,6 @@ export const WALK_GROUNDS: Action = {
   places: ["entrance"],
   hint: "玄関の脇から、庭に出られる",
   until: LEAVES,
-  repeatable: true,
   perSegment: { fatigue: -4 },
   segments: [
     {

@@ -103,6 +103,19 @@ function pushMove(log: LogEntry[], label: string, minutes: Minutes, startedAt: M
   return [...log, { label, minutes, startedAt, move: true }];
 }
 
+/**
+ * 続けて同じことをした分も一行にまとめる。何度でもできる行動（仮眠、一息つく、
+ * ぼーっとする）を三時間続けると、同じ行が二十本並んで記録が読めなくなる。
+ * 「一息つく 3時間20分」の方が、その午後がどうだったかは正確に伝わる。
+ */
+function pushEntry(log: LogEntry[], label: string, minutes: Minutes, startedAt: Minutes): LogEntry[] {
+  const last = log[log.length - 1];
+  if (last && !last.move && last.label === label && last.startedAt + last.minutes === startedAt) {
+    return [...log.slice(0, -1), { ...last, minutes: last.minutes + minutes }];
+  }
+  return [...log, { label, minutes, startedAt }];
+}
+
 /** 予定が終わる時刻。枠は開始時刻に固定されていて、着席の早い遅いでは動かない。 */
 function appointmentEnd(appointment: { at: Minutes; minutes: Minutes }): Minutes {
   return appointment.at + appointment.minutes;
@@ -272,7 +285,7 @@ function recordRun(state: GameState, run: SegmentRun): GameState {
     ...state,
     log:
       script.logged && spent > 0
-        ? [...state.log, { label: script.label, minutes: spent, startedAt: run.startedAt }]
+        ? pushEntry(state.log, script.label, spent, run.startedAt)
         : state.log,
     spentActions:
       usedUp && !script.repeatable && !state.spentActions.includes(actionId)

@@ -2,6 +2,7 @@ import { DAY_LENGTH } from "../../types/clock";
 import { formatClock, formatDuration } from "../../engine/clock";
 import { visibleFreeMinutes } from "../../engine/actions";
 import { fatigueGauge } from "../../engine/condition";
+import { canGoToBed } from "../../engine/sleep";
 import { nextVisibleAppointment } from "../../engine/schedule";
 import { placeById } from "../../data/places";
 import { MORNING_DATE_LABEL } from "../../data/schedule";
@@ -54,8 +55,10 @@ export function PlaceHeader() {
               <span className="figures mr-2 text-brass/80">{formatClock(upcoming.at)}</span>
               {upcoming.label}
             </>
+          ) : canGoToBed(state) ? (
+            "今日はここまで。寝てもいい"
           ) : (
-            "朝が終わるまで"
+            "日付が変わるまで"
           )}
         </span>
         <span className="figures shrink-0 text-[0.85rem] font-medium text-brass">
