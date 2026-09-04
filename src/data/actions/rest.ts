@@ -9,7 +9,7 @@ export const EAT_BREAKFAST: Action = {
   emoji: "🍳",
   places: ["living"],
   hint: "食卓に用意されている",
-  perSegment: { hunger: -30, fatigue: -2 },
+  perSegment: { hunger: -20, fatigue: -2 },
   segments: [
     {
       minutes: 10,
@@ -33,7 +33,7 @@ export const NAP: Action = {
   places: ["bedroom", "living"],
   hint: "目を閉じるだけでも違う",
   repeatable: true,
-  perSegment: { fatigue: -8 },
+  perSegment: { fatigue: -4 },
   segments: [
     {
       minutes: 15,
@@ -54,7 +54,7 @@ export const IDLE: Action = {
   places: ANYWHERE,
   hint: "何もしない",
   repeatable: true,
-  perSegment: { fatigue: -3 },
+  perSegment: { fatigue: -1 },
   segments: [
     {
       minutes: 15,
@@ -71,7 +71,7 @@ export const TAKE_SHOWER: Action = {
   emoji: "🚿",
   places: ["bath"],
   hint: "頭の芯まで起こす",
-  perSegment: { fatigue: -10 },
+  perSegment: { fatigue: -6 },
   segments: [
     {
       minutes: 10,

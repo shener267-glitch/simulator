@@ -220,12 +220,16 @@ function consumeSegment(state: GameState, script: Script, run: SegmentRun): Game
   const fits = segment.minutes <= remaining;
   const spent = fits ? segment.minutes : Math.max(0, remaining);
 
-  const afterElapsed = applyElapsed(state.condition, spent);
+  const clock = state.clock + spent;
+  const afterElapsed = applyElapsed(state.condition, spent, clock);
   const condition = fits
-    ? clampCondition({
-        fatigue: afterElapsed.fatigue + (script.perSegment?.fatigue ?? 0),
-        hunger: afterElapsed.hunger + (script.perSegment?.hunger ?? 0),
-      })
+    ? clampCondition(
+        {
+          fatigue: afterElapsed.fatigue + (script.perSegment?.fatigue ?? 0),
+          hunger: afterElapsed.hunger + (script.perSegment?.hunger ?? 0),
+        },
+        clock,
+      )
     : afterElapsed;
 
   const segmentIndex = fits ? run.segmentIndex + 1 : run.segmentIndex;
@@ -240,7 +244,7 @@ function consumeSegment(state: GameState, script: Script, run: SegmentRun): Game
 
   const next: GameState = {
     ...state,
-    clock: state.clock + spent,
+    clock,
     condition,
     highlights: fits && segment.highlight ? [...state.highlights, segment.highlight] : state.highlights,
     flags: fits ? addFlags(state.flags, segment.flags) : state.flags,
@@ -348,7 +352,7 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
         ...state,
         clock: state.clock + minutes,
         place: gameAction.place,
-        condition: applyElapsed(state.condition, minutes),
+        condition: applyElapsed(state.condition, minutes, state.clock + minutes),
         log: pushMove(state.log, `${place.short}へ移動`, minutes, state.clock),
       });
     }
@@ -384,7 +388,7 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
         return {
           ...closed,
           clock: closed.clock + spent,
-          condition: applyElapsed(closed.condition, spent),
+          condition: applyElapsed(closed.condition, spent, closed.clock + spent),
           log:
             spent > 0
               ? [
@@ -437,14 +441,18 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
       if (!offered || !offered.fits) return state;
       const choice = offered.choice;
 
-      const elapsed = applyElapsed(state.condition, choice.minutes);
+      const after = state.clock + choice.minutes;
+      const elapsed = applyElapsed(state.condition, choice.minutes, after);
       return {
         ...state,
-        clock: state.clock + choice.minutes,
-        condition: clampCondition({
-          fatigue: elapsed.fatigue + (choice.condition?.fatigue ?? 0),
-          hunger: elapsed.hunger + (choice.condition?.hunger ?? 0),
-        }),
+        clock: after,
+        condition: clampCondition(
+          {
+            fatigue: elapsed.fatigue + (choice.condition?.fatigue ?? 0),
+            hunger: elapsed.hunger + (choice.condition?.hunger ?? 0),
+          },
+          after,
+        ),
         flags: addFlags(state.flags, choice.flags),
         highlights: choice.highlight ? [...state.highlights, choice.highlight] : state.highlights,
         mode: {
@@ -494,7 +502,7 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
         ...state,
         clock,
         place: appointment.movesTo ?? state.place,
-        condition: applyElapsed(state.condition, spent),
+        condition: applyElapsed(state.condition, spent, state.clock + spent),
         appointments: state.appointments.map((candidate) =>
           candidate.id === appointment.id ? { ...candidate, resolved: true } : candidate,
         ),
@@ -642,7 +650,7 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
       return settle({
         ...state,
         clock: state.clock + spent,
-        condition: applyElapsed(state.condition, spent),
+        condition: applyElapsed(state.condition, spent, state.clock + spent),
         flags: addFlags(state.flags, message.flags),
         phone: {
           messages: state.phone.messages.map((candidate) =>

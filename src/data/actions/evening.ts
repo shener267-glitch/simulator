@@ -12,7 +12,7 @@ export const EAT_DINNER: Action = {
   places: ["living"],
   hint: "遅くなったが、まだ温かい",
   from: EVENING,
-  perSegment: { hunger: -35, fatigue: -3 },
+  perSegment: { hunger: -22, fatigue: -3 },
   segments: [
     {
       minutes: 15,
@@ -43,7 +43,7 @@ export const TAKE_BATH: Action = {
   places: ["bath"],
   hint: "湯に浸かる。今日は長くてもいい",
   from: EVENING,
-  perSegment: { fatigue: -12 },
+  perSegment: { fatigue: -7 },
   segments: [
     {
       minutes: 15,
@@ -136,7 +136,7 @@ export const SIT_WITH_FAMILY: Action = {
   hint: "話さなくてもいい",
   from: EVENING,
   repeatable: true,
-  perSegment: { fatigue: -6 },
+  perSegment: { fatigue: -3 },
   segments: [
     {
       minutes: 15,
@@ -146,37 +146,6 @@ export const SIT_WITH_FAMILY: Action = {
         `「いいから座ってて。${YOUNGER_SON.name}が帰ってきたら、顔だけ見せてあげて」`,
         `${ELDER_SON.name}からは、今日も連絡がない。就職して家を出てから、そういうものになった。`,
         "何も話さないまま、十五分が過ぎた。悪い十五分ではなかった。",
-      ],
-    },
-  ],
-};
-
-/** 官邸で午後を埋めるための、何度でもできる仕事（設計書14章）。 */
-export const SIGN_PAPERS: Action = {
-  id: "sign",
-  label: "決裁する",
-  category: "work",
-  emoji: "🖋️",
-  places: ["office"],
-  hint: "決裁箱が、また埋まっている",
-  until: EVENING,
-  repeatable: true,
-  perSegment: { fatigue: 3 },
-  segments: [
-    {
-      minutes: 10,
-      text: "決裁箱から一束取る。人事の内示、閣僚の出張、法案の閣議請議。",
-      lines: [
-        "一枚ずつ、説明の紙がついている。読めば十分かかり、読まなければ十秒で終わる。",
-        "読んだ。三枚目で、名前に見覚えのない外郭団体があった。付箋を貼って、篠塚の箱へ回した。",
-      ],
-    },
-    {
-      minutes: 10,
-      text: "続きを取る。手が慣れてくると、判を押す速さだけが上がっていく。",
-      lines: [
-        "速くなっていることに気づいて、一度手を止めた。",
-        "止めたところで、決裁箱の高さは変わらなかった。",
       ],
     },
   ],

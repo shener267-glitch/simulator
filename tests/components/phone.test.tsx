@@ -31,15 +31,14 @@ describe("the phone", () => {
     const news = findAction("news")!;
     const evening = findAction("news-evening")!;
 
-    // 06:00の寝室では朝刊が読める。夜のニュースは、居間に降りてもまだ無い。
+    // 06:00の寝室では朝刊が読める。夜のニュースは、まだ始まってもいない。
     expect(blockedBecause(awake(), news)).toBeNull();
-    expect(blockedBecause(at(awake(), "living"), evening)).toBe("time");
-    expect(blockedBecause(awake(), evening)).toBe("place");
+    expect(blockedBecause(awake(), evening)).toBe("time");
 
-    // 官邸の執務室には、どちらも無い。
+    // 官邸の執務室には、朝刊が置かれていない。夜のニュースはまだ時間ではない。
     const kantei = { ...at(awake(), "office"), clock: 300 };
     expect(blockedBecause(kantei, news)).toBe("place");
-    expect(blockedBecause(kantei, evening)).toBe("place");
+    expect(blockedBecause(kantei, evening)).toBe("time");
 
     // 21:00のリビングでは、朝刊はもう古く、夜のニュースが開く。
     const night = { ...at(awake(), "living"), clock: 900 };

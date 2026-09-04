@@ -66,9 +66,23 @@ export function hungerGauge(hunger: number): ConditionGauge {
   return gauge(hunger);
 }
 
-export function clampCondition(condition: Condition): Condition {
-  const clamp = (value: number) => Math.max(0, Math.min(100, value));
-  return { fatigue: clamp(condition.fatigue), hunger: clamp(condition.hunger) };
+export function clampCondition(condition: Condition, clock = 0): Condition {
+  return {
+    fatigue: Math.max(fatigueFloor(clock), Math.min(100, condition.fatigue)),
+    hunger: Math.max(0, Math.min(100, condition.hunger)),
+  };
+}
+
+/**
+ * その日のうちには、もう抜けないぶん（本セッションでの決定）。
+ *
+ * 仮眠も入浴も何度でもできるので、床がないと「一日の終わりに万全」が
+ * 常に作れてしまう。起きている時間そのものは休んでも消えない、という
+ * 一点だけを床にして、あとは休んだぶんだけ戻るようにしてある。
+ * 抜けるのは寝てからで、それは翌朝の話になる（engine/sleep.ts）。
+ */
+export function fatigueFloor(clock: number): number {
+  return Math.min(60, clock * 0.045);
 }
 
 /**
@@ -80,9 +94,12 @@ export function clampCondition(condition: Condition): Condition {
  * 24:00まで起きていれば疲労は限界近くまで積もり、空腹は振り切れる。三食と
  * 仮眠を取れば最後まで保つ、という幅になるように選んだ。
  */
-export function applyElapsed(condition: Condition, minutes: number): Condition {
-  return clampCondition({
-    fatigue: condition.fatigue + minutes * 0.03,
-    hunger: condition.hunger + minutes * 0.055,
-  });
+export function applyElapsed(condition: Condition, minutes: number, clock = 0): Condition {
+  return clampCondition(
+    {
+      fatigue: condition.fatigue + minutes * 0.03,
+      hunger: condition.hunger + minutes * 0.055,
+    },
+    clock,
+  );
 }

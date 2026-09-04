@@ -119,9 +119,12 @@ export function isSpent(state: GameState, action: Action): boolean {
 export type Unavailable = "place" | "time" | "spent";
 
 export function blockedBecause(state: GameState, action: Action): Unavailable | null {
-  if (!action.places.includes(state.place)) return "place";
+  // 順番に意味がある。読み終えた朝刊は、どの部屋にいても「見終えた」であって
+  // 「ここでは見られない」ではない。理由は、直せるものより先に、直せない
+  // ものを出す。
+  if (isSpent(state, action)) return "spent";
   if (action.from !== undefined && state.clock < action.from) return "time";
   if (action.until !== undefined && state.clock >= action.until) return "time";
-  if (isSpent(state, action)) return "spent";
+  if (!action.places.includes(state.place)) return "place";
   return null;
 }

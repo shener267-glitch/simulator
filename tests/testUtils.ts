@@ -5,6 +5,7 @@ import { runOf } from "../src/types/mode";
 import { gameReducer, type GameAction } from "../src/state/gameReducer";
 import { createInitialState } from "../src/state/initialState";
 import { neighboursOf } from "../src/data/places";
+import { applyElapsed } from "../src/engine/condition";
 
 export function run(state: GameState, ...actions: GameAction[]): GameState {
   return actions.reduce(gameReducer, state);
@@ -79,10 +80,14 @@ export function waitForNextAppointment(state: GameState): GameState {
     return gameReducer(state, { type: "MOVE_TO", place: towardsBedroom(state.place) });
   }
   const next = pending.reduce((soonest, a) => (a.at < soonest.at ? a : soonest));
-  return gameReducer({ ...state, clock: Math.max(state.clock, next.at - 1) }, {
-    type: "MOVE_TO",
-    place: step.id,
-  });
+  const clock = Math.max(state.clock, next.at - 1);
+  // 待つあいだも腹は減るし疲れる。ここを飛ばすと「何もしない」が得になる。
+  const waited: GameState = {
+    ...state,
+    clock,
+    condition: applyElapsed(state.condition, clock - state.clock, clock),
+  };
+  return gameReducer(waited, { type: "MOVE_TO", place: step.id });
 }
 
 /** 寝室へ向かう次の一歩。宿舎は廊下がハブなので、二手で必ず着く。 */

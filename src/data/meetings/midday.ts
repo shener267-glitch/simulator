@@ -255,7 +255,7 @@ export const LUNCH: Meeting = {
       label: "黙って食べる",
       note: "先に腹に入れる",
       minutes: 15,
-      condition: { hunger: -45, fatigue: -4 },
+      condition: { hunger: -32, fatigue: -4 },
       flags: ["ate-lunch"],
       highlight: "昼食をとった。",
       reply: [
@@ -269,7 +269,7 @@ export const LUNCH: Meeting = {
       label: "食べながら午後の段取りを詰める",
       note: "時間を二重に使う",
       minutes: 15,
-      condition: { hunger: -30, fatigue: 2 },
+      condition: { hunger: -22, fatigue: 2 },
       flags: ["ate-lunch", "worked-through-lunch"],
       reply: [
         {
@@ -286,7 +286,7 @@ export const LUNCH: Meeting = {
       label: `${SAWATARI.shortName}と雑談する`,
       note: "仕事の話をしない",
       minutes: 15,
-      condition: { hunger: -35, fatigue: -6 },
+      condition: { hunger: -26, fatigue: -6 },
       flags: ["ate-lunch", "talked-off-duty"],
       reply: [
         {

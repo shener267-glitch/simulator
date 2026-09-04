@@ -6,10 +6,10 @@ import {
   EAT_DINNER,
   EVENING_NEWS,
   PREPARE_TOMORROW,
-  SIGN_PAPERS,
   SIT_WITH_FAMILY,
   TAKE_BATH,
 } from "./evening";
+import { CHECK_PRESS, KANTEI_TEA, SIGN_PAPERS, WALK_GROUNDS } from "./kantei";
 
 /**
  * 設計書14章の分類。人と話すことは「行動」ではなく「話す」に移したので、
@@ -27,6 +27,7 @@ export const CATEGORY_ORDER: ActionCategory[] = ["info", "work", "rest", "life"]
 export const ACTIONS: Action[] = [
   WATCH_NEWS,
   EVENING_NEWS,
+  CHECK_PRESS,
   CHECK_SNS,
   READ_DOCUMENTS,
   WRITE_NOTES,
@@ -35,10 +36,12 @@ export const ACTIONS: Action[] = [
   EAT_BREAKFAST,
   EAT_DINNER,
   NAP,
+  KANTEI_TEA,
   IDLE,
   SIT_WITH_FAMILY,
   TAKE_SHOWER,
   TAKE_BATH,
+  WALK_GROUNDS,
   GET_READY,
 ];
 
