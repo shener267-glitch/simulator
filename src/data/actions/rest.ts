@@ -18,6 +18,7 @@ export const EAT_BREAKFAST: Action = {
     {
       minutes: 10,
       text: "味噌汁を飲み干す。体の内側が温まっていくのが分かる。\n\n新聞をたたんで脇に置き、残りを黙って食べた。食べ終える頃には、少し人心地がついていた。",
+      flags: ["ate-breakfast"],
       highlight: "朝食をとった。",
     },
   ],
@@ -75,6 +76,7 @@ export const TAKE_SHOWER: Action = {
     {
       minutes: 10,
       text: "熱い湯を頭から浴びる。首の後ろに溜まっていたものが、少しずつ流れていく。\n\n湯気で曇った鏡を手のひらで拭った。顎の小さな切り傷が、まだ赤い。\n\n出る前に、冷たい水に切り替えて三十秒だけ立った。目の奥が、はっきりと開く。",
+      flags: ["washed"],
       highlight: "シャワーを浴びた。",
     },
   ],
@@ -97,6 +99,7 @@ export const GET_READY: Action = {
     {
       minutes: 10,
       text: "スーツに着替える。昨日と同じ紺。ネクタイだけ変えた。\n\n袖を通しながら、これが制服になるのだ、と思った。",
+      flags: ["dressed"],
       highlight: "身支度を整えた。",
     },
   ],

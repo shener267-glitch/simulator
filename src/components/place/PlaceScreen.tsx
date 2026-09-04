@@ -6,6 +6,7 @@ import { MoveSheet } from "./MoveSheet";
 import { TalkSheet } from "./TalkSheet";
 import { ItemSheet } from "./ItemSheet";
 import { DurationSheet } from "./DurationSheet";
+import { ConcernCard } from "./ConcernCard";
 import { ConditionMeter } from "../shared/ConditionMeter";
 import { describeCondition, hungerGauge } from "../../engine/condition";
 import { useGameState } from "../../state/GameContext";
@@ -25,6 +26,8 @@ export function PlaceScreen() {
       <PlaceHeader />
 
       <div className="flex flex-1 flex-col gap-4 pt-5">
+        <ConcernCard />
+
         <div className="rounded-2xl border border-line bg-ink-panel px-5 py-4">
           <p className="font-figure text-[0.6rem] font-medium tracking-label text-brass">CONDITION</p>
 

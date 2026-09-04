@@ -51,7 +51,7 @@ describe("spending time on an action", () => {
     );
 
     expect(after.clock).toBe(25);
-    expect(after.log).toEqual([{ label: "資料を読む", minutes: 25, startedAt: 0 }]);
+    expect(after.log).toEqual([{ label: "経済対策の資料を読む", minutes: 25, startedAt: 0 }]);
   });
 
   it("picks a half-finished action back up where it was left", () => {
@@ -149,7 +149,7 @@ describe("choosing how long to spend", () => {
     );
 
     expect(after.clock).toBe(15);
-    expect(after.log).toEqual([{ label: "資料を読む", minutes: 15, startedAt: 0 }]);
+    expect(after.log).toEqual([{ label: "経済対策の資料を読む", minutes: 15, startedAt: 0 }]);
     expect(after.actionProgress.documents).toBe(1);
   });
 
@@ -228,7 +228,7 @@ describe("appointments, which are not negotiable", () => {
 
     const stopped = gameReducer(state, { type: "STOP_ACTION" });
     expect(stopped.log[stopped.log.length - 1]).toEqual({
-      label: "資料を読む",
+      label: "経済対策の資料を読む",
       minutes: 5,
       startedAt: 110,
     });
@@ -458,7 +458,7 @@ describe("the call that arrives on its own", () => {
     expect(answered.clock).toBe(217);
     expect(answered.mode).toMatchObject({ kind: "interrupt", answered: true });
     // 手を止めた行動は、そこまでの分がきちんと記録される。
-    expect(answered.log.map((entry) => entry.label)).toContain("資料を読む");
+    expect(answered.log.map((entry) => entry.label)).toContain("経済対策の資料を読む");
     expect(answered.log[answered.log.length - 1]).toEqual({
       label: "篠塚からの連絡",
       minutes: 10,
