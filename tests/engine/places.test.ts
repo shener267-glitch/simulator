@@ -4,7 +4,7 @@ import { PLACES, PLACE_ORDER } from "../../src/data/places";
 import { ACTIONS } from "../../src/data/actions";
 import type { PlaceId } from "../../src/types/place";
 
-describe("getting around the residence", () => {
+describe("getting around the dormitory", () => {
   it("puts every room one minute off the corridor", () => {
     for (const id of ["bedroom", "bath", "living", "study"] as PlaceId[]) {
       expect(travelMinutes(id, "corridor")).toBe(1);
@@ -20,12 +20,12 @@ describe("getting around the residence", () => {
     expect(canTravel("corridor", "living")).toBe(true);
   });
 
-  it("keeps the 官邸 out of reach on foot from the residence", () => {
+  it("keeps the 官邸 out of reach on foot from the dormitory", () => {
     // 徒歩一分の隣同士だが、入るのは07:30の予定の側の都合による。
     for (const id of PLACE_ORDER) {
-      if (PLACES[id].building !== "residence") continue;
+      if (PLACES[id].building !== "dormitory") continue;
       for (const exit of exitsFrom(id)) {
-        expect(PLACES[exit.id].building).toBe("residence");
+        expect(PLACES[exit.id].building).toBe("dormitory");
       }
     }
   });

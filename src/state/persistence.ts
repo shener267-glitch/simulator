@@ -1,4 +1,5 @@
 import type { GameState } from "../types/game";
+import { isPlaceId } from "../data/places";
 import { SAVE_VERSION } from "./initialState";
 
 /** 版はここ一箇所から作る。定数とキー文字列に別々に埋めると必ずずれる。 */
@@ -24,7 +25,8 @@ export function loadGame(): GameState | null {
     if (parsed.saveVersion !== SAVE_VERSION) return null;
     // 画面の種類が読めないセーブは、routing が判断できないので捨てる。
     if (typeof parsed.mode?.kind !== "string") return null;
-    if (typeof parsed.place !== "string") return null;
+    // 消えた部屋を持つセーブを通すと、あとで placeById が落ちる。
+    if (!isPlaceId(parsed.place)) return null;
     return parsed;
   } catch {
     return null;

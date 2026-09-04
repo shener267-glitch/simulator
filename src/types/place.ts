@@ -1,25 +1,31 @@
 import type { Minutes } from "./clock";
 
 /**
- * 現在地はv0.2の中核（設計書15章）。場所は背景ではなく、そこで何ができるかを
- * 決めるゲームシステムそのもの。行動は自分が置かれる場所を宣言し、現在地に
+ * 現在地はこのゲームの中核（設計書15章）。場所は背景ではなく、そこで何が
+ * できるかを決める仕組みそのもの。行動は自分の置かれる場所を宣言し、現在地に
  * ない行動はメニューに出さない（設計書16章）。
  */
 export type PlaceId =
+  // 議員宿舎。就任直後で、公邸にはまだ入居していない。
   | "bedroom"
   | "corridor"
   | "bath"
   | "living"
   | "study"
+  // 官邸。閣議室や応接室は「立ち寄る部屋」ではなく予定の中の出来事として扱う。
+  | "entrance"
   | "office"
   | "secretariat";
 
-/** 公邸と官邸は徒歩一分の隣同士だが、行き来するのは予定の側の都合による。 */
-export type Building = "residence" | "kantei";
+/**
+ * 公邸に移るのは今後のイベント。建物を型で持っておけば、部屋を足すだけで
+ * 引っ越しを作れる。
+ */
+export type Building = "dormitory" | "kantei";
 
 export interface Place {
   id: PlaceId;
-  /** 画面に出す正式な呼び方。「公邸・寝室」 */
+  /** 画面に出す正式な呼び方。「議員宿舎・寝室」 */
   label: string;
   /** 移動メニューなどで使う短い呼び方。「寝室」 */
   short: string;

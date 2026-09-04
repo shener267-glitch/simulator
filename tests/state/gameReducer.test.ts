@@ -18,7 +18,7 @@ import {
 } from "../testUtils";
 
 describe("waking up", () => {
-  it("opens on the 05:00 wake-up and costs no time", () => {
+  it("opens on the 06:00 wake-up and costs no time", () => {
     const state = createInitialState();
     expect(state.clock).toBe(0);
     expect(state.mode.kind).toBe("wake");
@@ -162,7 +162,7 @@ describe("choosing how long to spend", () => {
   });
 });
 
-describe("moving around the residence", () => {
+describe("moving around the dormitory", () => {
   it("costs a minute and puts the player in the next room", () => {
     const after = gameReducer(awake(), { type: "MOVE_TO", place: "corridor" });
     expect(after.clock).toBe(1);

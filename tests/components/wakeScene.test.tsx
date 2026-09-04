@@ -89,7 +89,7 @@ describe("the opening", () => {
     fireEvent.click(screen.getByRole("button", { name: "起きる" }));
 
     // 起きた先は行動一覧ではなく現在地の画面。四つの入口がそこにある。
-    expect(screen.getByText("公邸・寝室")).toBeInTheDocument();
+    expect(screen.getByText("議員宿舎・寝室")).toBeInTheDocument();
     for (const command of ["行動", "話す", "移動", "アイテム"]) {
       expect(screen.getByRole("button", { name: new RegExp(command) })).toBeInTheDocument();
     }

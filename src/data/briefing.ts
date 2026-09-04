@@ -12,7 +12,7 @@ export const BRIEFING_APPOINTMENT: Appointment = {
 };
 
 /**
- * 07:30。公邸と官邸は徒歩一分だが、出るのはこちらの都合ではない。
+ * 議員宿舎から官邸へは車で送られる。出るのはこちらの都合ではない。
  * 済むと現在地が官邸・執務室に変わる（設計書22章）。
  */
 export const KANTEI_ARRIVAL_APPOINTMENT: Appointment = {
@@ -52,14 +52,14 @@ export const APPOINTMENT_SCENES: Record<string, SceneLine[]> = {
   kantei: [
     {
       speaker: SAWATARI.shortName,
-      text: "「そろそろ出ましょう。歩いて一分ですが、一分でも遅れると全部が押しますので」",
+      text: "「そろそろ出ましょう。車を下に着けてあります」",
     },
     {
-      text: "公邸を出る。まだ涼しい。官邸の玄関までの短い距離に、警護がついた。\n\n昨日までは、この道を自分の足で歩く人間ではなかった。",
+      text: "宿舎の玄関を出ると、黒い車列が待っていた。警護が先に立ち、後ろのドアが開く。\n\n昨日までは、この道を自分の足で歩いて駅まで行く人間だった。",
     },
     {
       speaker: SAWATARI.shortName,
-      text: "「今日から、ここが職場です」",
+      text: "「公邸への引っ越しは、落ち着いてからで結構です。当面はここから通っていただきます」",
     },
   ],
   "chief-meeting": [
@@ -114,7 +114,7 @@ export const WAKE_BEATS: WakeBeat[] = [
   { kind: "line", lines: ["2026年6月6日、土曜日。"] },
   {
     kind: "line",
-    lines: ["総理大臣官邸に隣接する公邸。", "慣れない天井が視界に入る。"],
+    lines: ["議員宿舎の一室。", "十二年見てきたはずの天井が、今朝は少し違って見える。"],
   },
   {
     kind: "line",
@@ -146,7 +146,7 @@ export const TODAY_SCHEDULE: { time: string; label: string }[] = [
   { time: "14:00", label: "各省事務次官への訓示" },
   { time: "15:30", label: "外国首脳との電話会談（数件）" },
   { time: "17:00", label: "記者団ぶら下がり" },
-  { time: "19:00", label: "公邸へ戻る" },
+  { time: "20:00", label: "官邸発・議員宿舎へ" },
 ];
 
 export const BRIEFING_SCENE = {
