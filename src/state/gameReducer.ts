@@ -5,6 +5,7 @@ import type { RestingMode, SegmentRun, SegmentSource } from "../types/mode";
 import type { PlaceId } from "../types/place";
 import { durationOptions, interruptionGuard, isSpent, resumeIndex } from "../engine/actions";
 import { isDayOver } from "../engine/clock";
+import { canGoToBed, carriedFatigue } from "../engine/sleep";
 import { applyElapsed, clampCondition } from "../engine/condition";
 import { travelMinutes } from "../engine/places";
 import { dueAppointment, dueInterrupt, moveAppointment } from "../engine/schedule";
@@ -54,6 +55,7 @@ export type GameAction =
   | { type: "END_MEETING" }
   /** 後回しにした連絡を読む。読むにも時間はかかる。 */
   | { type: "READ_MESSAGE"; messageId: string }
+  | { type: "GO_TO_BED" }
   | { type: "RESTART_DAY" }
   | { type: "NEW_GAME" };
 
@@ -106,6 +108,24 @@ function appointmentEnd(appointment: { at: Minutes; minutes: Minutes }): Minutes
   return appointment.at + appointment.minutes;
 }
 
+/**
+ * 一日を閉じる。自分で寝たのか、日付が変わったのかだけを分けて記録する。
+ * 翌朝へ持ち越す疲労はここで確定させる — 遅く寝たことの代償はこれで全部で、
+ * 点数も評価も出さない（本セッションでの決定）。
+ */
+function closeDay(state: GameState, forced: boolean): GameState {
+  return {
+    ...state,
+    phase: "review",
+    mode: { kind: "place" },
+    sleep: {
+      at: state.clock,
+      forced,
+      carriedFatigue: carriedFatigue(state.condition.fatigue, state.clock),
+    },
+  };
+}
+
 function addFlags(flags: string[], added?: string[]): string[] {
   if (!added?.length) return flags;
   const next = [...flags];
@@ -139,8 +159,9 @@ function settleHard(state: GameState): GameState {
     };
   }
 
+  // 24:00。自分で寝なかった場合は、ここで一日が閉じる。
   if (isDayOver(state.clock)) {
-    return { ...state, phase: "review" };
+    return closeDay(state, true);
   }
 
   return state;
@@ -153,6 +174,9 @@ function settleHard(state: GameState): GameState {
  */
 function settleSoft(state: GameState): GameState {
   if (state.phase !== "day") return state;
+  // 日付が変わっていたら、もう鳴らさない。一日が閉じたあとで携帯が鳴っても
+  // 出る先がない — 24:00をまたいだ連絡は、そのまま届かなかったことにする。
+  if (isDayOver(state.clock)) return state;
   // 起床中は鳴らさない。割り込みの入れ子も作らない。会議の最中も鳴らさない —
   // 閣議の途中で携帯に出る総理はいないし、枠の中で時間を食われても困る。
   if (state.mode.kind === "wake" || state.mode.kind === "interrupt") return state;
@@ -260,6 +284,9 @@ function available(state: GameState, actionId: string): FreeAction | null {
   if (!action) return null;
   // 現在地でできないことは、そもそも起こらない（設計書16章）。
   if (!action.places.includes(state.place)) return null;
+  // 時間帯も同じ。朝刊は夜には無いし、夕食は朝には出ていない。
+  if (action.from !== undefined && state.clock < action.from) return null;
+  if (action.until !== undefined && state.clock >= action.until) return null;
   if (isSpent(state, action)) return null;
   return action;
 }
@@ -630,6 +657,13 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
               ]
             : state.log,
       });
+    }
+
+    case "GO_TO_BED": {
+      // 寝室でしか寝られないし、予定が残っているうちは寝かせない。
+      if (state.mode.kind !== "place") return state;
+      if (!canGoToBed(state)) return state;
+      return closeDay(state, false);
     }
 
     case "RESTART_DAY":

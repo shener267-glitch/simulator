@@ -128,4 +128,9 @@ export interface GameState {
   actionProgress: Record<string, number>;
   /** 相手ごとに、もう聞いてしまった話題。会話を抜けても朝の終わりまで残る。 */
   talkProgress: Record<string, string[]>;
+  /**
+   * どう一日を閉じたか。自分で寝たのか、24:00に閉じられたのか、そのとき
+   * 何を翌朝へ持ち越すのか。翌日はまだ作らないが、引き継げる形にしておく。
+   */
+  sleep: { at: Minutes; forced: boolean; carriedFatigue: number } | null;
 }

@@ -23,7 +23,16 @@ export function canTravel(from: PlaceId, to: PlaceId): boolean {
   return travelMinutes(from, to) !== null;
 }
 
-/** その場所で選べる行動。並び順は ACTIONS の定義順のまま。 */
-export function actionsAt(place: PlaceId): Action[] {
-  return ACTIONS.filter((action) => action.places.includes(place));
+/**
+ * その場所で、その時刻に選べる行動。並び順は ACTIONS の定義順のまま。
+ * 時刻を省略すると時間帯の絞り込みをしない — データの検査でだけ使う。
+ */
+export function actionsAt(place: PlaceId, clock?: Minutes): Action[] {
+  return ACTIONS.filter(
+    (action) =>
+      action.places.includes(place) &&
+      (clock === undefined ||
+        ((action.from === undefined || clock >= action.from) &&
+          (action.until === undefined || clock < action.until))),
+  );
 }

@@ -7,6 +7,7 @@ import { TalkSheet } from "./TalkSheet";
 import { ItemSheet } from "./ItemSheet";
 import { DurationSheet } from "./DurationSheet";
 import { ConcernCard } from "./ConcernCard";
+import { BedSheet } from "./BedSheet";
 import { ConditionMeter } from "../shared/ConditionMeter";
 import { describeCondition, hungerGauge } from "../../engine/condition";
 import { useGameState } from "../../state/GameContext";
@@ -55,6 +56,7 @@ export function PlaceScreen() {
       {panel === "talk" && <TalkSheet onClose={() => setPanel(null)} />}
       {panel === "move" && <MoveSheet onClose={() => setPanel(null)} />}
       {panel === "item" && <ItemSheet onClose={() => setPanel(null)} />}
+      {panel === "bed" && <BedSheet onClose={() => setPanel(null)} />}
     </div>
   );
 }

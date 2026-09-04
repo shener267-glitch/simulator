@@ -2,6 +2,14 @@ import type { Action, ActionCategory } from "../../types/action";
 import { CHECK_SNS, WATCH_NEWS } from "./info";
 import { READ_DOCUMENTS, WRITE_NOTES } from "./work";
 import { EAT_BREAKFAST, GET_READY, IDLE, NAP, TAKE_SHOWER } from "./rest";
+import {
+  EAT_DINNER,
+  EVENING_NEWS,
+  PREPARE_TOMORROW,
+  SIGN_PAPERS,
+  SIT_WITH_FAMILY,
+  TAKE_BATH,
+} from "./evening";
 
 /**
  * 設計書14章の分類。人と話すことは「行動」ではなく「話す」に移したので、
@@ -18,13 +26,19 @@ export const CATEGORY_ORDER: ActionCategory[] = ["info", "work", "rest", "life"]
 
 export const ACTIONS: Action[] = [
   WATCH_NEWS,
+  EVENING_NEWS,
   CHECK_SNS,
   READ_DOCUMENTS,
   WRITE_NOTES,
+  SIGN_PAPERS,
+  PREPARE_TOMORROW,
   EAT_BREAKFAST,
+  EAT_DINNER,
   NAP,
   IDLE,
+  SIT_WITH_FAMILY,
   TAKE_SHOWER,
+  TAKE_BATH,
   GET_READY,
 ];
 

@@ -32,5 +32,6 @@ export function createInitialState(player?: GameState["player"]): GameState {
     spentActions: [],
     actionProgress: {},
     talkProgress: {},
+    sleep: null,
   };
 }

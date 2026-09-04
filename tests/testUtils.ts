@@ -72,12 +72,21 @@ export function resolvedIds(state: GameState): string[] {
  */
 export function waitForNextAppointment(state: GameState): GameState {
   const pending = state.appointments.filter((appointment) => !appointment.resolved);
-  if (pending.length === 0) return state;
-  const next = pending.reduce((soonest, a) => (a.at < soonest.at ? a : soonest));
   const step = neighboursOf(state.place)[0];
   if (!step) return state;
+  // 予定が尽きていたら、あとは寝るだけ。寝室まで一部屋ずつ歩く。
+  if (pending.length === 0) {
+    return gameReducer(state, { type: "MOVE_TO", place: towardsBedroom(state.place) });
+  }
+  const next = pending.reduce((soonest, a) => (a.at < soonest.at ? a : soonest));
   return gameReducer({ ...state, clock: Math.max(state.clock, next.at - 1) }, {
     type: "MOVE_TO",
     place: step.id,
   });
+}
+
+/** 寝室へ向かう次の一歩。宿舎は廊下がハブなので、二手で必ず着く。 */
+function towardsBedroom(from: PlaceId): PlaceId {
+  if (from === "bedroom") return "bedroom";
+  return neighboursOf(from).some((place) => place.id === "bedroom") ? "bedroom" : "corridor";
 }

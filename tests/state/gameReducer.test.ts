@@ -5,6 +5,8 @@ import { createInitialState } from "../../src/state/initialState";
 import { durationOptions, remainingToTarget } from "../../src/engine/actions";
 import { actionsAt } from "../../src/engine/places";
 import { offeredChoices } from "../../src/engine/meeting";
+import { canGoToBed } from "../../src/engine/sleep";
+import { DAY_LENGTH } from "../../src/types/clock";
 import { choicesAt, talkableAt } from "../../src/engine/talk";
 import { findTree } from "../../src/data/talk";
 import { findAction } from "../../src/data/actions";
@@ -645,7 +647,7 @@ describe("the whole day", () => {
         state = gameReducer(state, { type: "RESOLVE_APPOINTMENT" });
         continue;
       }
-      const available = actionsAt(state.place).find(
+      const available = actionsAt(state.place, state.clock).find(
         (action) => !state.spentActions.includes(action.id),
       );
       // 一日ぶんの行動はまだ揃っていない。尽きたらそこで止める。
@@ -677,15 +679,31 @@ describe("the whole day", () => {
         state = gameReducer(state, { type: "RESOLVE_APPOINTMENT" });
         continue;
       }
-      const available = actionsAt(state.place).find(
+      // 予定が尽きたら寝床へ向かう。繰り返せる行動があるので、そうしないと
+      // いつまでも夜が続いて24:00に閉じられてしまう。
+      if (state.appointments.every((appointment) => appointment.resolved)) {
+        if (canGoToBed(state)) {
+          state = gameReducer(state, { type: "GO_TO_BED" });
+          continue;
+        }
+        const stepped = waitForNextAppointment(state);
+        if (stepped.clock !== state.clock) {
+          state = stepped;
+          continue;
+        }
+        break;
+      }
+      const available = actionsAt(state.place, state.clock).find(
         (action) => !state.spentActions.includes(action.id),
       );
       if (available) {
         state = playThrough(state, available.id);
         continue;
       }
+      const before = state.clock;
       state = waitForNextAppointment(state);
-      if (state.mode.kind === "place") break; // 待つ先がもうない
+      // 予定も尽き、寝床にも辿り着けないなら、そこで止める。
+      if (state.clock === before) break;
     }
     return state;
   }
@@ -696,6 +714,56 @@ describe("the whole day", () => {
     // 一日を最後まで埋めるコンテンツはまだないが、使った分は必ずログに残る。
     expect(state.clock).toBeGreaterThan(180);
     expect(totalLogged(state)).toBe(state.clock);
+  });
+
+  it("ends the day in bed, once there is nothing left on the schedule", () => {
+    const state = playUntilReview();
+
+    expect(state.phase).toBe("review");
+    expect(state.sleep).not.toBeNull();
+    expect(state.sleep?.forced).toBe(false);
+    expect(state.clock).toBeGreaterThanOrEqual(840);
+    expect(state.clock).toBeLessThanOrEqual(DAY_LENGTH);
+  });
+
+  it("closes the day at midnight for a player who never stops", () => {
+    // 夜の行動には繰り返せるものがあるので、続けようと思えば続けられる。
+    // 続けたぶんは、翌朝に持ち越す疲労になって返ってくる。
+    let awakeAll = awake();
+    for (let guard = 0; guard < 800 && awakeAll.phase === "day"; guard += 1) {
+      if (awakeAll.mode.kind === "interrupt") {
+        awakeAll = awakeAll.mode.answered
+          ? gameReducer(awakeAll, { type: "CLOSE_INTERRUPT" })
+          : gameReducer(awakeAll, { type: "ANSWER_INTERRUPT", choice: "answer" });
+        continue;
+      }
+      if (awakeAll.mode.kind === "duration") {
+        awakeAll = gameReducer(awakeAll, { type: "CANCEL_DURATION" });
+        continue;
+      }
+      if (awakeAll.mode.kind === "meeting") {
+        awakeAll = sitThroughMeeting(awakeAll);
+        continue;
+      }
+      if (awakeAll.mode.kind === "appointment") {
+        awakeAll = gameReducer(awakeAll, { type: "RESOLVE_APPOINTMENT" });
+        continue;
+      }
+      const next = actionsAt(awakeAll.place, awakeAll.clock).find(
+        (action) => !awakeAll.spentActions.includes(action.id),
+      );
+      if (next) {
+        awakeAll = playThrough(awakeAll, next.id);
+        continue;
+      }
+      const before = awakeAll.clock;
+      awakeAll = waitForNextAppointment(awakeAll);
+      if (awakeAll.clock === before) break;
+    }
+
+    expect(awakeAll.phase).toBe("review");
+    expect(awakeAll.clock).toBe(DAY_LENGTH);
+    expect(awakeAll.sleep).toMatchObject({ forced: true });
   });
 
   it("gets the call and every appointment in, however the time was spent", () => {

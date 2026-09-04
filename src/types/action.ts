@@ -44,4 +44,10 @@ export interface Action {
   perSegment?: ConditionDelta;
   /** Segments reset when the action is picked again instead of being used up. */
   repeatable?: boolean;
+  /**
+   * 時間帯。夕食は夜にしかなく、朝刊は朝にしかない。場所と同じで、外れて
+   * いるものは灰色にせず、そもそも一覧に出さない（設計書16章）。
+   */
+  from?: Minutes;
+  until?: Minutes;
 }

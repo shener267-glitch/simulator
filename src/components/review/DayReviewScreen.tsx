@@ -4,6 +4,8 @@ import { formatClock, formatDuration } from "../../engine/clock";
 import { describeCondition, fatigueGauge, hungerGauge } from "../../engine/condition";
 import { MORNING_DATE_STAMP } from "../../data/schedule";
 import { describeTendency } from "../../data/tendencies";
+import { reviewBlocks } from "../../engine/review";
+import { describeBedtime } from "../../engine/sleep";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
 
 /**
@@ -13,7 +15,7 @@ import { useGameDispatch, useGameState } from "../../state/GameContext";
 export function DayReviewScreen() {
   const state = useGameState();
   const dispatch = useGameDispatch();
-  const total = state.log.reduce((sum, entry) => sum + entry.minutes, 0);
+  const blocks = reviewBlocks(state);
   const tendency = describeTendency(state.flags);
 
   return (
@@ -25,34 +27,35 @@ export function DayReviewScreen() {
         <h1 className="mt-3 text-[1.6rem] font-normal tracking-wide text-body">一日の記録</h1>
       </div>
 
-      <section className="flex flex-col gap-2.5">
-        <div className="flex items-center gap-3">
-          <h2 className="text-[0.72rem] font-medium tracking-[0.2em] text-body-muted">使った時間</h2>
-          <span className="h-px flex-1 bg-line" />
-        </div>
-        <ul className="overflow-hidden rounded-2xl border border-line bg-ink-panel">
-          {state.log.map((entry, index) => (
-            <li
-              key={`${entry.startedAt}-${index}`}
-              className="flex items-baseline gap-3.5 border-b border-line px-4 py-3"
-            >
-              <span className="figures shrink-0 font-figure text-[0.78rem] text-brass/70">
-                {formatClock(entry.startedAt)}
-              </span>
-              <span className="min-w-0 flex-1 text-[0.88rem] text-body">{entry.label}</span>
-              <span className="figures shrink-0 text-[0.78rem] text-body-muted">
-                {formatDuration(entry.minutes)}
-              </span>
-            </li>
-          ))}
-          <li className="flex items-baseline gap-3.5 bg-ink-raised px-4 py-3">
-            <span className="min-w-0 flex-1 text-[0.8rem] tracking-wider text-body-muted">合計</span>
-            <span className="figures shrink-0 text-[0.85rem] font-medium text-brass">
-              {formatDuration(total)}
+      {blocks.map((block) => (
+        <section key={block.id} className="flex flex-col gap-2.5">
+          <div className="flex items-center gap-3">
+            <h2 className="text-[0.72rem] font-medium tracking-[0.2em] text-body-muted">
+              {block.label}
+            </h2>
+            <span className="h-px flex-1 bg-line" />
+            <span className="figures shrink-0 text-[0.75rem] text-brass/70">
+              {formatDuration(block.minutes)}
             </span>
-          </li>
-        </ul>
-      </section>
+          </div>
+          <ul className="overflow-hidden rounded-2xl border border-line bg-ink-panel">
+            {block.entries.map((entry, index) => (
+              <li
+                key={`${entry.startedAt}-${index}`}
+                className="flex items-baseline gap-3.5 border-b border-line px-4 py-3 last:border-b-0"
+              >
+                <span className="figures shrink-0 font-figure text-[0.78rem] text-brass/70">
+                  {formatClock(entry.startedAt)}
+                </span>
+                <span className="min-w-0 flex-1 text-[0.88rem] text-body">{entry.label}</span>
+                <span className="figures shrink-0 text-[0.78rem] text-body-muted">
+                  {formatDuration(entry.minutes)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
 
       {state.highlights.length > 0 && (
         <section className="flex flex-col gap-2.5">
@@ -70,6 +73,21 @@ export function DayReviewScreen() {
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {state.sleep && (
+        <section className="flex flex-col gap-2.5">
+          <div className="flex items-center gap-3">
+            <h2 className="text-[0.72rem] font-medium tracking-[0.2em] text-body-muted">就寝</h2>
+            <span className="h-px flex-1 bg-line" />
+            <span className="figures shrink-0 text-[0.75rem] text-brass/70">
+              {formatClock(state.sleep.at)}
+            </span>
+          </div>
+          <p className="rounded-2xl border border-line bg-ink-panel px-5 py-4 text-[0.9rem] leading-[1.95] text-body">
+            {describeBedtime(state.sleep.at, state.sleep.forced)}
+          </p>
         </section>
       )}
 
@@ -109,8 +127,8 @@ export function DayReviewScreen() {
       )}
 
       <div className="mt-1 rounded-2xl border border-line/60 px-5 py-4 text-[0.82rem] leading-[1.9] text-body-faint">
-        <p>v0.2ではここまで。</p>
-        <p>午前以降のフェーズは今後のバージョンで実装予定。</p>
+        <p>6月6日は、ここまで。</p>
+        <p>翌日以降は今後のバージョンで実装予定。</p>
       </div>
 
       <button

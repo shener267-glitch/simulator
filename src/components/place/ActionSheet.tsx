@@ -12,7 +12,7 @@ export function ActionSheet({ onClose }: { onClose: () => void }) {
   const state = useGameState();
   const dispatch = useGameDispatch();
 
-  const actions = actionsAt(state.place);
+  const actions = actionsAt(state.place, state.clock);
 
   return (
     <Modal title="行動" onClose={onClose}>
