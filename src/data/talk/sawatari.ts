@@ -54,15 +54,15 @@ export const SAWATARI_TREE: TalkTree = {
         {
           kind: "topic",
           id: "order-dig",
-          label: "昨日の報道について調べてもらう",
+          label: "党内の声の出どころを調べてもらう",
           once: true,
-          requiresFlag: "knows-about-report",
-          flags: ["chased-the-report"],
+          requiresFlag: "knows-the-objection",
+          flags: ["chased-the-objection"],
           reply: {
             minutes: 10,
             speaker: SAWATARI.shortName,
-            text: "「もう当たっています。事務所の担当者に直接、篠塚から」\n\n言葉を選ぶ間があった。\n\n「一件だけなら訂正で済みます。二件目が出てくると、話が変わります。そこを先に確かめています」",
-            highlight: "沢渡と篠塚に、記載漏れの件の裏取りを頼んだ。",
+            text: "「もう当たっています。書いた記者に、篠塚から直接」\n\n言葉を選ぶ間があった。\n\n「一人が言っているだけなら、記事にはなりません。なったということは、複数から同じ話が取れているということです」",
+            highlight: "沢渡と篠塚に、党内の異論の出どころを当たらせた。",
           },
         },
       ],
@@ -86,13 +86,13 @@ export const SAWATARI_TREE: TalkTree = {
         {
           kind: "topic",
           id: "consult-report",
-          label: "昨日の報道について",
+          label: "党内の異論について",
           once: true,
-          requiresFlag: "knows-about-report",
+          requiresFlag: "knows-the-objection",
           reply: {
             minutes: 10,
             speaker: SAWATARI.shortName,
-            text: "「額の話ではありません。時期の話です」\n\n「発足翌朝というだけで、同じ記事が三倍の重さで読まれます。中身を説明しても、そこは動きません」\n\n「今日は短くお答えください。長く答えたぶんだけ、見出しが長くなります」",
+            text: "「中身の話ではありません。順番の話です」\n\n「発足翌日に党を通さず固めた、という形になるのを嫌がっておられるだけです。中身を説明しても、そこは動きません」\n\n「今日は短くお答えください。長く答えたぶんだけ、見出しが長くなります」",
           },
         },
         {

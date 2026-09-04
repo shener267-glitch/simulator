@@ -1,3 +1,4 @@
+import { formatClock } from "./clock";
 import type { Minutes } from "../types/clock";
 import type { Appointment, GameState, SoftInterrupt } from "../types/game";
 
@@ -52,4 +53,21 @@ export function dueInterrupt(state: GameState, clock: Minutes): SoftInterrupt | 
 export function dueAppointment(state: GameState, clock: Minutes): Appointment | null {
   const appointment = nextAppointment(state);
   return appointment && appointment.at <= clock ? appointment : null;
+}
+
+/**
+ * 予定表に出す一日ぶん。`state.appointments` から導くので、着信で予定が動いても
+ * カレンダーだけ古いまま、ということが起きない（設計書13章）。
+ */
+export function daySchedule(state: GameState): { id: string; time: string; label: string; done: boolean }[] {
+  return state.appointments
+    .filter(isAnnounced)
+    .slice()
+    .sort((a, b) => a.at - b.at)
+    .map((appointment) => ({
+      id: appointment.id,
+      time: formatClock(appointment.at),
+      label: appointment.label,
+      done: appointment.resolved,
+    }));
 }

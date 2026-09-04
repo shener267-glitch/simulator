@@ -8,6 +8,7 @@ import { isDayOver } from "../engine/clock";
 import { applyElapsed, clampCondition } from "../engine/condition";
 import { travelMinutes } from "../engine/places";
 import { dueAppointment, dueInterrupt, moveAppointment } from "../engine/schedule";
+import { findMeeting, offeredChoices } from "../engine/meeting";
 import { choicesAt, talkableAt } from "../engine/talk";
 import { nodeOf, choiceOf } from "../types/talk";
 import { placeById } from "../data/places";
@@ -43,6 +44,14 @@ export type GameAction =
   | { type: "TALK_BACK" }
   /** 切る。会話全体を一行にしてログに残す。 */
   | { type: "END_TALK" }
+  /** 会議の開幕を読み終えて、話題を選ぶ段へ。 */
+  | { type: "MEETING_BEGIN" }
+  /** 会議の中で話題を一つ選ぶ。枠の中で分を使う（設計書15章）。 */
+  | { type: "MEETING_CHOOSE"; choiceId: string }
+  /** 返事を読み終えて話題の一覧に戻る。枠が尽きていれば締めへ。 */
+  | { type: "MEETING_BACK" }
+  /** 会議を終える。残った枠は締めの中で消える。 */
+  | { type: "END_MEETING" }
   /** 後回しにした連絡を読む。読むにも時間はかかる。 */
   | { type: "READ_MESSAGE"; messageId: string }
   | { type: "RESTART_DAY" }
@@ -114,7 +123,20 @@ function settleHard(state: GameState): GameState {
 
   const appointment = dueAppointment(state, state.clock);
   if (appointment) {
-    return { ...state, mode: { kind: "appointment", appointmentId: appointment.id } };
+    // 場面のある予定は会議として開く。移動だけの予定は読んで確認するだけ。
+    return {
+      ...state,
+      mode: findMeeting(appointment.id)
+        ? {
+            kind: "meeting",
+            appointmentId: appointment.id,
+            startedAt: state.clock,
+            stage: "opening",
+            showing: null,
+            taken: [],
+          }
+        : { kind: "appointment", appointmentId: appointment.id },
+    };
   }
 
   if (isDayOver(state.clock)) {
@@ -131,8 +153,10 @@ function settleHard(state: GameState): GameState {
  */
 function settleSoft(state: GameState): GameState {
   if (state.phase !== "day") return state;
-  // 起床中は鳴らさない。割り込みの入れ子も作らない。
+  // 起床中は鳴らさない。割り込みの入れ子も作らない。会議の最中も鳴らさない —
+  // 閣議の途中で携帯に出る総理はいないし、枠の中で時間を食われても困る。
   if (state.mode.kind === "wake" || state.mode.kind === "interrupt") return state;
+  if (state.mode.kind === "meeting") return state;
   const resume: RestingMode = state.mode;
 
   const interrupt = dueInterrupt(state, state.clock);
@@ -371,8 +395,61 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
       return settle({ ...state, mode: { kind: "place" } });
     }
 
+    case "MEETING_BEGIN": {
+      if (state.mode.kind !== "meeting" || state.mode.stage !== "opening") return state;
+      return { ...state, mode: { ...state.mode, stage: "choices" } };
+    }
+
+    case "MEETING_CHOOSE": {
+      if (state.mode.kind !== "meeting" || state.mode.stage !== "choices") return state;
+      const mode = state.mode;
+      const offered = offeredChoices(state).find(
+        (candidate) => candidate.choice.id === gameAction.choiceId,
+      );
+      // 枠に入らない話題は選べない。会議は伸ばせないので、ここは警告ではなく拒否。
+      if (!offered || !offered.fits) return state;
+      const choice = offered.choice;
+
+      const elapsed = applyElapsed(state.condition, choice.minutes);
+      return {
+        ...state,
+        clock: state.clock + choice.minutes,
+        condition: clampCondition({
+          fatigue: elapsed.fatigue + (choice.condition?.fatigue ?? 0),
+          hunger: elapsed.hunger + (choice.condition?.hunger ?? 0),
+        }),
+        flags: addFlags(state.flags, choice.flags),
+        highlights: choice.highlight ? [...state.highlights, choice.highlight] : state.highlights,
+        mode: {
+          ...mode,
+          stage: "reply",
+          showing: choice.id,
+          taken: [...mode.taken, choice.id],
+        },
+      };
+    }
+
+    case "MEETING_BACK": {
+      if (state.mode.kind !== "meeting" || state.mode.stage !== "reply") return state;
+      // 枠を使い切っていたら、話題の一覧に戻さずそのまま締めへ。
+      const noRoomLeft = offeredChoices({
+        ...state,
+        mode: { ...state.mode, stage: "choices" },
+      }).every((candidate) => !candidate.fits);
+
+      return {
+        ...state,
+        mode: { ...state.mode, stage: noRoomLeft ? "closing" : "choices", showing: null },
+      };
+    }
+
+    case "END_MEETING": {
+      if (state.mode.kind !== "meeting" || state.mode.stage === "closing") return state;
+      return { ...state, mode: { ...state.mode, stage: "closing", showing: null } };
+    }
+
     case "RESOLVE_APPOINTMENT": {
-      if (state.mode.kind !== "appointment") return state;
+      if (state.mode.kind !== "appointment" && state.mode.kind !== "meeting") return state;
       const appointmentId = state.mode.appointmentId;
       const appointment = state.appointments.find((candidate) => candidate.id === appointmentId);
       if (!appointment) return state;
@@ -382,6 +459,9 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
       // 崩れる。08:20〜09:00の会議は、何分に座っても09:00に終わる。
       const clock = Math.max(state.clock, Math.min(DAY_LENGTH, appointmentEnd(appointment)));
       const spent = clock - state.clock;
+      // 会議は席についたところから一行にまとめる。中で使った分は選択肢の側で
+      // すでに時計を進めているので、ここで数え直さないと記録から抜け落ちる。
+      const openedAt = state.mode.kind === "meeting" ? state.mode.startedAt : state.clock;
 
       return settle({
         ...state,
@@ -393,8 +473,8 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
         ),
         mode: { kind: "place" },
         log:
-          spent > 0
-            ? [...state.log, { label: appointment.label, minutes: spent, startedAt: state.clock }]
+          clock > openedAt
+            ? [...state.log, { label: appointment.label, minutes: clock - openedAt, startedAt: openedAt }]
             : state.log,
         highlights: appointment.highlight
           ? [...state.highlights, appointment.highlight]

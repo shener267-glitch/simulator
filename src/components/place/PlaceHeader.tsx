@@ -4,7 +4,7 @@ import { visibleFreeMinutes } from "../../engine/actions";
 import { fatigueGauge } from "../../engine/condition";
 import { nextVisibleAppointment } from "../../engine/schedule";
 import { placeById } from "../../data/places";
-import { MORNING_DATE_LABEL } from "../../data/briefing";
+import { MORNING_DATE_LABEL } from "../../data/schedule";
 import { ConditionMeter } from "../shared/ConditionMeter";
 import { useGameState } from "../../state/GameContext";
 

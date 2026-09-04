@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DayScreen } from "../../src/components/morning/DayScreen";
 import { GameProvider } from "../../src/state/GameContext";
-import { WAKE_BEATS } from "../../src/data/briefing";
+import { WAKE_BEATS } from "../../src/data/schedule";
 
 const LAST_BEAT = WAKE_BEATS.length - 1;
 

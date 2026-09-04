@@ -1,6 +1,6 @@
 import { ScreenContainer } from "../shared/ScreenContainer";
 import { formatClock, formatDuration } from "../../engine/clock";
-import { APPOINTMENT_SCENES, type SceneLine } from "../../data/briefing";
+import { APPOINTMENT_SCENES, type SceneLine } from "../../data/schedule";
 import { placeById } from "../../data/places";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
 

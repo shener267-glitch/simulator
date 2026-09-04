@@ -4,6 +4,7 @@ import type { PlaceId } from "../src/types/place";
 import { runOf } from "../src/types/mode";
 import { gameReducer, type GameAction } from "../src/state/gameReducer";
 import { createInitialState } from "../src/state/initialState";
+import { neighboursOf } from "../src/data/places";
 
 export function run(state: GameState, ...actions: GameAction[]): GameState {
   return actions.reduce(gameReducer, state);
@@ -58,4 +59,25 @@ export function playThrough(state: GameState, actionId: string): GameState {
 
 export function totalLogged(state: GameState): number {
   return state.log.reduce((sum, entry) => sum + entry.minutes, 0);
+}
+
+/** 済んだ予定のid。予定が動いても順番で数えなくて済むように。 */
+export function resolvedIds(state: GameState): string[] {
+  return state.appointments.filter((appointment) => appointment.resolved).map((a) => a.id);
+}
+
+/**
+ * できることが尽きた時間を飛ばす。次の予定の一分前まで時計を進めて、
+ * 一分歩いて席につく — 待つという行動がまだゲームに無いので、テストでだけ使う。
+ */
+export function waitForNextAppointment(state: GameState): GameState {
+  const pending = state.appointments.filter((appointment) => !appointment.resolved);
+  if (pending.length === 0) return state;
+  const next = pending.reduce((soonest, a) => (a.at < soonest.at ? a : soonest));
+  const step = neighboursOf(state.place)[0];
+  if (!step) return state;
+  return gameReducer({ ...state, clock: Math.max(state.clock, next.at - 1) }, {
+    type: "MOVE_TO",
+    place: step.id,
+  });
 }

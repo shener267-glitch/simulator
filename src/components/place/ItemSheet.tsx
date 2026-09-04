@@ -4,7 +4,7 @@ import { SheetRow } from "../shared/SheetRow";
 import { actionMinutesLeft, isSpent } from "../../engine/actions";
 import { formatClock, formatDuration } from "../../engine/clock";
 import { ITEMS, PHONE_APPS } from "../../data/items";
-import { TODAY_SCHEDULE } from "../../data/briefing";
+import { daySchedule } from "../../engine/schedule";
 import { findAction } from "../../data/actions";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
 
@@ -85,10 +85,20 @@ export function ItemSheet({ onClose }: { onClose: () => void }) {
     return (
       <Modal title="カレンダー" onClose={onClose}>
         <ul className="overflow-hidden rounded-xl border border-line bg-ink-panel">
-          {TODAY_SCHEDULE.map((entry) => (
-            <li key={entry.time} className="flex gap-4 border-b border-line px-4 py-3 last:border-b-0">
-              <span className="figures shrink-0 text-[0.8rem] text-brass/80">{entry.time}</span>
-              <span className="min-w-0 text-[0.85rem] leading-[1.7] text-body-muted">{entry.label}</span>
+          {daySchedule(state).map((entry) => (
+            <li key={entry.id} className="flex gap-4 border-b border-line px-4 py-3 last:border-b-0">
+              <span
+                className={`figures shrink-0 text-[0.8rem] ${entry.done ? "text-body-faint" : "text-brass/80"}`}
+              >
+                {entry.time}
+              </span>
+              <span
+                className={`min-w-0 text-[0.85rem] leading-[1.7] ${
+                  entry.done ? "text-body-faint line-through" : "text-body-muted"
+                }`}
+              >
+                {entry.label}
+              </span>
             </li>
           ))}
         </ul>

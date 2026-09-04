@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { gameReducer } from "../../src/state/gameReducer";
+import type { GameState } from "../../src/types/game";
 import { createInitialState } from "../../src/state/initialState";
 import { durationOptions, remainingToTarget } from "../../src/engine/actions";
 import { actionsAt } from "../../src/engine/places";
+import { offeredChoices } from "../../src/engine/meeting";
 import { choicesAt, talkableAt } from "../../src/engine/talk";
 import { findTree } from "../../src/data/talk";
 import { findAction } from "../../src/data/actions";
@@ -12,6 +14,8 @@ import {
   currentRun,
   playThrough,
   resolved,
+  resolvedIds,
+  waitForNextAppointment,
   run,
   totalLogged,
   withoutCall,
@@ -212,54 +216,53 @@ describe("moving around the dormitory", () => {
 
 describe("appointments, which are not negotiable", () => {
   it("cuts an action short at the appointment and charges only the minutes that were left", () => {
-    // 次の予定まで10分しかないところに、15分の資料を開く。
+    // 07:50。出発まで5分しかないところに、15分の資料を開く。
     const state = gameReducer(
       { ...withoutCall(awake()), clock: 110 },
       { type: "START_ACTION", actionId: "documents" },
     );
 
-    expect(state.clock).toBe(120);
+    expect(state.clock).toBe(115);
     expect(currentRun(state)?.interrupted).toBe(true);
-    expect(currentRun(state)?.minutesSpent).toBe(10);
+    expect(currentRun(state)?.minutesSpent).toBe(5);
 
     const stopped = gameReducer(state, { type: "STOP_ACTION" });
     expect(stopped.log[stopped.log.length - 1]).toEqual({
       label: "資料を読む",
-      minutes: 10,
+      minutes: 5,
       startedAt: 110,
     });
     // 読み切っていないので、あとで資料の続きから読める。
     expect(stopped.actionProgress.documents).toBe(0);
   });
 
-  it("ends the briefing when it is scheduled to end, not half an hour after sitting down", () => {
-    let state = { ...withoutCall(awake()), clock: 120 };
-    state = gameReducer(state, { type: "FINISH_WAKE" }); // すでに place なので何も起きない
-    state = gameReducer({ ...state, mode: { kind: "place" } }, { type: "MOVE_TO", place: "corridor" });
+  it("ends a fixed-frame appointment when it is scheduled to end, not when the player sat down", () => {
+    let state = { ...withoutCall(awake()), clock: 114 };
+    state = gameReducer(state, { type: "MOVE_TO", place: "corridor" });
 
-    expect(state.mode).toMatchObject({ kind: "appointment", appointmentId: "briefing" });
+    expect(state.mode).toMatchObject({ kind: "appointment", appointmentId: "departure" });
 
     state = gameReducer(state, { type: "RESOLVE_APPOINTMENT" });
-    // 120分の予定を30分。廊下へ一分歩いてから座っても、終わりは150分のまま。
+    // 07:55からの5分。廊下へ一分歩いてから車に乗っても、終わりは08:00のまま。
     // 遅れがそのまま後ろへ伸びると、予定が並んだ一日で時間割が崩れていく。
-    expect(state.clock).toBe(150);
-    expect(state.highlights).toContain("沢渡と篠塚から本日の日程の説明を受けた。");
+    expect(state.clock).toBe(120);
+    expect(state.highlights).toContain("官邸に入った。");
   });
 });
 
 describe("being taken to the 官邸", () => {
-  it("carries the player across at 07:30 without asking", () => {
-    // 07:25、公邸のリビングにいる。予定は待ってくれない。
-    let state = { ...resolved(withoutCall(at(awake(), "living")), "briefing"), clock: 145 };
+  it("carries the player across at 07:55 without asking", () => {
+    // 07:50、宿舎のリビングにいる。予定は待ってくれない。
+    let state = { ...withoutCall(at(awake(), "living")), clock: 110 };
     state = gameReducer(state, { type: "START_ACTION", actionId: "breakfast" });
     state = gameReducer(state, { type: "STOP_ACTION" });
 
-    expect(state.mode).toMatchObject({ kind: "appointment", appointmentId: "kantei" });
+    expect(state.mode).toMatchObject({ kind: "appointment", appointmentId: "departure" });
     expect(state.place).toBe("living");
 
     state = gameReducer(state, { type: "RESOLVE_APPOINTMENT" });
-    expect(state.clock).toBe(155);
-    expect(state.place).toBe("office");
+    expect(state.clock).toBe(120);
+    expect(state.place).toBe("entrance");
     expect(state.highlights).toContain("官邸に入った。");
   });
 
@@ -267,63 +270,160 @@ describe("being taken to the 官邸", () => {
     const here = actionsAt("office").map((action) => action.id);
     expect(here.length).toBeGreaterThan(0);
     expect(here).toContain("documents");
-    // 公邸へ歩いて戻る道はプレイヤーには開いていない。
+    // 議員宿舎へ歩いて戻る道はプレイヤーには開いていない。
     expect(gameReducer({ ...awake(), place: "office" }, { type: "MOVE_TO", place: "living" }).place).toBe(
       "office",
     );
   });
+});
 
-  it("runs the 官房長官 meeting out to 08:00 and carries on into the day", () => {
-    let state = {
-      ...resolved(withoutCall(at(awake(), "office")), "briefing", "kantei"),
-      clock: 165,
+describe("a meeting, which fills its frame and no more", () => {
+  /** 08:00のぶら下がりの直前。次の一手で席につくことになる。 */
+  function upToTheGaggle() {
+    return {
+      ...resolved(withoutCall(at(awake(), "entrance")), "departure"),
+      clock: 119,
     };
-    state = gameReducer(state, { type: "MOVE_TO", place: "secretariat" });
+  }
 
-    expect(state.mode).toMatchObject({ kind: "appointment", appointmentId: "chief-meeting" });
+  it("opens the appointment as a scene, not as a wall of text", () => {
+    const state = gameReducer(upToTheGaggle(), { type: "MOVE_TO", place: "office" });
 
+    expect(state.mode).toMatchObject({
+      kind: "meeting",
+      appointmentId: "gaggle",
+      stage: "opening",
+      taken: [],
+    });
+  });
+
+  it("spends the frame on what the player chooses, and will not run past it", () => {
+    let state = gameReducer(upToTheGaggle(), { type: "MOVE_TO", place: "office" });
+    state = gameReducer(state, { type: "MEETING_BEGIN" });
+
+    expect(state.mode).toMatchObject({ kind: "meeting", stage: "choices" });
+    // 落とし穴3の回帰: 会議中の予定は自分自身を天井にするので、区切りで即座に
+    // 切られたりはしない。10分の枠に、5分の話題はきちんと入る。
+    expect(offeredChoices(state).every((candidate) => candidate.fits)).toBe(true);
+
+    state = gameReducer(state, { type: "MEETING_CHOOSE", choiceId: "gaggle-economy" });
+    expect(state.clock).toBe(125);
+    expect(state.flags).toContain("spoke-on-economy");
+    expect(state.mode).toMatchObject({ kind: "meeting", stage: "reply", showing: "gaggle-economy" });
+
+    // 残り5分。5分の話題はまだ入るが、席を立てば枠の終わりまで飛ぶ。
+    state = gameReducer(state, { type: "MEETING_BACK" });
+    state = gameReducer(state, { type: "END_MEETING" });
     state = gameReducer(state, { type: "RESOLVE_APPOINTMENT" });
-    expect(state.clock).toBe(180);
-    // 08:00はもう一日の終わりではない。ここから先が本番になる。
-    expect(state.phase).toBe("day");
+
+    expect(state.clock).toBe(130);
+    expect(resolvedIds(state)).toContain("gaggle");
+  });
+
+  it("never pushes the next appointment, however much was asked", () => {
+    let state = gameReducer(upToTheGaggle(), { type: "MOVE_TO", place: "office" });
+    state = gameReducer(state, { type: "MEETING_BEGIN" });
+
+    for (let guard = 0; guard < 10; guard += 1) {
+      if (state.mode.kind !== "meeting") break;
+      if (state.mode.stage === "reply") {
+        state = gameReducer(state, { type: "MEETING_BACK" });
+        continue;
+      }
+      const next = offeredChoices(state).find((candidate) => candidate.fits);
+      if (!next) break;
+      state = gameReducer(state, { type: "MEETING_CHOOSE", choiceId: next.choice.id });
+    }
+
+    // 枠は10分。何を選んでも、08:10を過ぎることはない。
+    expect(state.clock).toBeLessThanOrEqual(130);
+  });
+
+  it("keeps the topics that do not fit on the table, greyed out", () => {
+    let state = gameReducer(upToTheGaggle(), { type: "MOVE_TO", place: "office" });
+    state = gameReducer(state, { type: "MEETING_BEGIN" });
+    state = gameReducer(state, { type: "MEETING_CHOOSE", choiceId: "gaggle-economy" });
+    state = gameReducer(state, { type: "MEETING_BACK" });
+
+    const offered = offeredChoices(state);
+    // 残り5分。5分の話題は選べて、それ以上のものは見えているが選べない。
+    expect(offered.some((candidate) => candidate.fits)).toBe(true);
+    expect(offered.every((candidate) => candidate.choice.minutes <= 5 || !candidate.fits)).toBe(true);
+    // 一度選んだ話題は二度は出ない。
+    expect(offered.map((candidate) => candidate.choice.id)).not.toContain("gaggle-economy");
+  });
+
+  it("opens the party leaders up to a reader and closes it to everyone else", () => {
+    // 設計書8章。朝に資料を読んだかどうかが、ここで初めて形になって出る。
+    const sat = (flags: string[]) =>
+      gameReducer(
+        {
+          ...resolved(
+            withoutCall(at(awake(), "office")),
+            "departure",
+            "gaggle",
+            "morning-meeting",
+            "cabinet",
+          ),
+          clock: 299,
+          flags,
+        },
+        { type: "MOVE_TO", place: "secretariat" },
+      );
+
+    const read = gameReducer(sat(["read-economic-papers"]), { type: "MEETING_BEGIN" });
+    const unread = gameReducer(sat([]), { type: "MEETING_BEGIN" });
+
+    const idsOf = (state: typeof read) => offeredChoices(state).map((c) => c.choice.id);
+
+    expect(idsOf(read)).toContain("party-figures");
+    expect(idsOf(read)).not.toContain("party-delegate");
+    expect(idsOf(read)).not.toContain("party-later");
+
+    expect(idsOf(unread)).not.toContain("party-figures");
+    expect(idsOf(unread)).toContain("party-delegate");
+    expect(idsOf(unread)).toContain("party-later");
   });
 });
 
 describe("the call that arrives on its own", () => {
-  /** 着信の五分前。次の一区切りで受け取ることになる。 */
+  /** 09:17の着信の五分前。執務室にいて、次の一区切りで受け取ることになる。 */
   function upToTheCall() {
-    return { ...awake(), clock: 65 };
+    return {
+      ...resolved(at(awake(), "office"), "departure", "gaggle", "morning-meeting"),
+      clock: 192,
+    };
   }
 
   it("does not cut the segment short the way an appointment does", () => {
     // 15分の資料を開く。着信はその途中に来るが、区切りまでは切られない。
     const state = gameReducer(upToTheCall(), { type: "START_ACTION", actionId: "documents" });
 
-    expect(state.clock).toBe(80);
+    expect(state.clock).toBe(207);
     expect(currentRun(state)?.interrupted).toBe(false);
     expect(currentRun(state)?.minutesSpent).toBe(15);
   });
 
   it("rings at the end of the segment, over the action the player was in", () => {
-    const state = gameReducer(upToTheCall(), { type: "START_ACTION", actionId: "news" });
+    const state = gameReducer(upToTheCall(), { type: "START_ACTION", actionId: "sns" });
 
     expect(state.mode).toMatchObject({
       kind: "interrupt",
-      interruptId: "funding-report",
+      interruptId: "indicator",
       answered: false,
       resume: { kind: "action" },
     });
   });
 
-  it("moves the briefing to 06:30 whichever way the player answers", () => {
-    expect(awake().appointments.find((a) => a.id === "briefing")?.at).toBe(120);
+  it("pulls the party leaders forward to 10:45 whichever way the player answers", () => {
+    expect(awake().appointments.find((a) => a.id === "party-leaders")?.at).toBe(300);
 
     for (const choice of ["answer", "defer", "ignore"] as const) {
       const rung = gameReducer(upToTheCall(), { type: "START_ACTION", actionId: "documents" });
       const answered = gameReducer(rung, { type: "ANSWER_INTERRUPT", choice });
 
-      expect(answered.appointments.find((a) => a.id === "briefing")?.at).toBe(90);
-      expect(answered.highlights.some((line) => line.includes("06:30"))).toBe(true);
+      expect(answered.appointments.find((a) => a.id === "party-leaders")?.at).toBe(285);
+      expect(answered.highlights.some((line) => line.includes("10:45"))).toBe(true);
     }
   });
 
@@ -333,11 +433,11 @@ describe("the call that arrives on its own", () => {
 
     const deferred = gameReducer(rung, { type: "ANSWER_INTERRUPT", choice: "defer" });
 
-    expect(deferred.clock).toBe(80);
+    expect(deferred.clock).toBe(207);
     expect(deferred.mode.kind).toBe("action");
     expect(currentRun(deferred)).toEqual(before);
     expect(deferred.phone.messages).toHaveLength(1);
-    expect(deferred.phone.messages[0].from).toBe("官房長官");
+    expect(deferred.phone.messages[0].from).toBe("篠塚");
     expect(deferred.flags).toContain("deferred-the-call");
   });
 
@@ -345,7 +445,7 @@ describe("the call that arrives on its own", () => {
     const rung = gameReducer(upToTheCall(), { type: "START_ACTION", actionId: "documents" });
     const ignored = gameReducer(rung, { type: "ANSWER_INTERRUPT", choice: "ignore" });
 
-    expect(ignored.clock).toBe(80);
+    expect(ignored.clock).toBe(207);
     expect(ignored.mode.kind).toBe("action");
     expect(ignored.phone.messages).toHaveLength(0);
     expect(ignored.flags).toContain("ignored-the-call");
@@ -355,20 +455,20 @@ describe("the call that arrives on its own", () => {
     const rung = gameReducer(upToTheCall(), { type: "START_ACTION", actionId: "documents" });
     const answered = gameReducer(rung, { type: "ANSWER_INTERRUPT", choice: "answer" });
 
-    expect(answered.clock).toBe(90);
+    expect(answered.clock).toBe(217);
     expect(answered.mode).toMatchObject({ kind: "interrupt", answered: true });
     // 手を止めた行動は、そこまでの分がきちんと記録される。
     expect(answered.log.map((entry) => entry.label)).toContain("資料を読む");
     expect(answered.log[answered.log.length - 1]).toEqual({
-      label: "官房長官からの連絡",
+      label: "篠塚からの連絡",
       minutes: 10,
-      startedAt: 80,
+      startedAt: 207,
     });
     expect(answered.actionProgress.documents).toBe(1);
 
+    // 09:27。閉じた先はまだ自由時間で、閣議まではもう少しある。
     const closed = gameReducer(answered, { type: "CLOSE_INTERRUPT" });
-    // 06:30。閉じた先はもうブリーフィングの時間。
-    expect(closed.mode).toMatchObject({ kind: "appointment", appointmentId: "briefing" });
+    expect(closed.mode.kind).toBe("place");
   });
 
   it("only rings once, whatever else happens", () => {
@@ -388,7 +488,7 @@ describe("talking to people", () => {
     expect(talkableAt(at(awake(), "living")).map((tree) => tree.id)).toContain("wife");
     expect(talkableAt(at(awake(), "living")).map((tree) => tree.id)).not.toContain("son");
 
-    const later = { ...at(awake(), "living"), clock: 125 };
+    const later = { ...at(awake(), "living"), clock: 65 };
     expect(talkableAt(later).map((tree) => tree.id)).toContain("son");
   });
 
@@ -434,7 +534,7 @@ describe("talking to people", () => {
       "consult-report",
     );
 
-    const informed = { ...before, flags: ["knows-about-report"] };
+    const informed = { ...before, flags: ["knows-the-objection"] };
     expect(choicesAt(informed, tree, consult).map((choice) => choice.id)).toContain(
       "consult-report",
     );
@@ -442,67 +542,89 @@ describe("talking to people", () => {
 
   it("opens that topic up by reading the morning paper all the way through", () => {
     const read = playThrough(awake(), "news");
-    expect(read.flags).toContain("knows-about-report");
+    expect(read.flags).toContain("knows-the-objection");
   });
 
   it("ends the conversation when an appointment cuts a reply short", () => {
-    // 06:55。ブリーフィングまで5分しかないところに10分の返事。
+    // 07:50。出発まで5分しかないところに10分の返事。
     const state = run(
-      { ...withoutCall(awake()), clock: 115 },
+      { ...withoutCall(awake()), clock: 110 },
       { type: "OPEN_TALK", treeId: "shinozuka" },
       { type: "TALK_GOTO", nodeId: "consult" },
       { type: "TALK_CHOOSE", choiceId: "consult-opinion" },
     );
 
-    expect(state.clock).toBe(120);
+    expect(state.clock).toBe(115);
     expect(currentRun(state)?.interrupted).toBe(true);
 
     const after = gameReducer(state, { type: "TALK_BACK" });
     expect(after.log[after.log.length - 1]).toEqual({
       label: "篠塚と話した",
       minutes: 5,
-      startedAt: 115,
+      startedAt: 110,
     });
-    expect(after.mode).toMatchObject({ kind: "appointment", appointmentId: "briefing" });
+    expect(after.mode).toMatchObject({ kind: "appointment", appointmentId: "departure" });
   });
 });
 
 describe("reading what was put off", () => {
-  it("charges for reading it, so putting it off is not a free way to hear it", () => {
-    let state = playThrough(awake(), "documents"); // 30分
-    state = playThrough(state, "ready"); // 20分
-    state = playThrough(state, "idle"); // 15分 → 06:05
-    state = gameReducer(state, { type: "START_ACTION", actionId: "news" }); // 着信
-    state = gameReducer(state, { type: "ANSWER_INTERRUPT", choice: "defer" });
-    state = gameReducer(state, { type: "STOP_ACTION" });
+  /** 着信を後回しにして、要点だけがメッセージで残っている状態を作る。 */
+  function deferredTheCall() {
+    const rung = gameReducer(
+      {
+        ...resolved(at(awake(), "office"), "departure", "gaggle", "morning-meeting"),
+        clock: 192,
+      },
+      { type: "START_ACTION", actionId: "documents" },
+    );
+    return gameReducer(gameReducer(rung, { type: "ANSWER_INTERRUPT", choice: "defer" }), {
+      type: "STOP_ACTION",
+    });
+  }
 
-    expect(state.flags).not.toContain("knows-about-report");
+  it("charges for reading it, so putting it off is not a free way to hear it", () => {
+    let state = deferredTheCall();
+
+    expect(state.flags).not.toContain("knows-the-indicator");
     const before = state.clock;
 
-    state = gameReducer(state, { type: "READ_MESSAGE", messageId: "funding-report" });
+    state = gameReducer(state, { type: "READ_MESSAGE", messageId: "indicator" });
 
     expect(state.clock).toBe(before + 5);
-    expect(state.flags).toContain("knows-about-report");
+    expect(state.flags).toContain("knows-the-indicator");
     expect(state.phone.messages[0].read).toBe(true);
-    expect(state.log[state.log.length - 1].label).toBe("官房長官からのメッセージ");
+    expect(state.log[state.log.length - 1].label).toBe("篠塚からのメッセージ");
   });
 
   it("does not read the same message twice", () => {
-    let state = playThrough(awake(), "documents");
-    state = playThrough(state, "ready");
-    state = playThrough(state, "idle");
-    state = gameReducer(state, { type: "START_ACTION", actionId: "news" });
-    state = gameReducer(state, { type: "ANSWER_INTERRUPT", choice: "defer" });
-    state = gameReducer(state, { type: "STOP_ACTION" });
-    state = gameReducer(state, { type: "READ_MESSAGE", messageId: "funding-report" });
+    const state = gameReducer(deferredTheCall(), { type: "READ_MESSAGE", messageId: "indicator" });
 
-    const again = gameReducer(state, { type: "READ_MESSAGE", messageId: "funding-report" });
+    const again = gameReducer(state, { type: "READ_MESSAGE", messageId: "indicator" });
     expect(again.clock).toBe(state.clock);
   });
 });
 
-describe("the whole morning", () => {
-  function playUntilReview() {
+describe("the whole day", () => {
+  /** 会議は「入って、入るだけ聞いて、締める」。予定を必ず枠ぴったりで終える。 */
+  function sitThroughMeeting(state: GameState): GameState {
+    let next = gameReducer(state, { type: "MEETING_BEGIN" });
+    for (let guard = 0; guard < 20; guard += 1) {
+      if (next.mode.kind !== "meeting") break;
+      if (next.mode.stage === "reply") {
+        next = gameReducer(next, { type: "MEETING_BACK" });
+        continue;
+      }
+      if (next.mode.stage === "closing") break;
+      const topic = offeredChoices(next).find((candidate) => candidate.fits);
+      if (!topic) break;
+      next = gameReducer(next, { type: "MEETING_CHOOSE", choiceId: topic.choice.id });
+    }
+    next = gameReducer(next, { type: "END_MEETING" });
+    return gameReducer(next, { type: "RESOLVE_APPOINTMENT" });
+  }
+
+  /** 手が空いているあいだは、その場でできることを片端からやる。 */
+  function playUntilStuck(): GameState {
     let state = awake();
     for (let guard = 0; guard < 400 && state.phase === "day"; guard += 1) {
       if (state.mode.kind === "interrupt") {
@@ -513,6 +635,10 @@ describe("the whole morning", () => {
       }
       if (state.mode.kind === "duration") {
         state = gameReducer(state, { type: "CANCEL_DURATION" });
+        continue;
+      }
+      if (state.mode.kind === "meeting") {
+        state = sitThroughMeeting(state);
         continue;
       }
       if (state.mode.kind === "appointment") {
@@ -529,24 +655,69 @@ describe("the whole morning", () => {
     return state;
   }
 
+  /** できることが尽きたら、次の予定の一分前まで待つ。予定は待っていれば来る。 */
+  function playUntilReview(): GameState {
+    let state = awake();
+    for (let guard = 0; guard < 800 && state.phase === "day"; guard += 1) {
+      if (state.mode.kind === "interrupt") {
+        state = state.mode.answered
+          ? gameReducer(state, { type: "CLOSE_INTERRUPT" })
+          : gameReducer(state, { type: "ANSWER_INTERRUPT", choice: "answer" });
+        continue;
+      }
+      if (state.mode.kind === "duration") {
+        state = gameReducer(state, { type: "CANCEL_DURATION" });
+        continue;
+      }
+      if (state.mode.kind === "meeting") {
+        state = sitThroughMeeting(state);
+        continue;
+      }
+      if (state.mode.kind === "appointment") {
+        state = gameReducer(state, { type: "RESOLVE_APPOINTMENT" });
+        continue;
+      }
+      const available = actionsAt(state.place).find(
+        (action) => !state.spentActions.includes(action.id),
+      );
+      if (available) {
+        state = playThrough(state, available.id);
+        continue;
+      }
+      state = waitForNextAppointment(state);
+      if (state.mode.kind === "place") break; // 待つ先がもうない
+    }
+    return state;
+  }
+
   it("accounts for every minute it spends", () => {
-    const state = playUntilReview();
+    const state = playUntilStuck();
 
     // 一日を最後まで埋めるコンテンツはまだないが、使った分は必ずログに残る。
     expect(state.clock).toBeGreaterThan(180);
     expect(totalLogged(state)).toBe(state.clock);
   });
 
-  it("always gets the call and the briefing in, however the time was spent", () => {
+  it("gets the call and every appointment in, however the time was spent", () => {
     const state = playUntilReview();
 
     expect(state.interrupts.every((item) => item.fired)).toBe(true);
     expect(state.appointments.every((appointment) => appointment.resolved)).toBe(true);
-    expect(state.log.some((entry) => entry.label.includes("ブリーフィング"))).toBe(true);
+    expect(state.log.some((entry) => entry.label.includes("閣議"))).toBe(true);
   });
 
-  it("puts the morning back to 05:00 when it is restarted", () => {
-    const restarted = gameReducer(playUntilReview(), { type: "RESTART_DAY" });
+  it("never lets a meeting push the next appointment", () => {
+    const state = playUntilReview();
+
+    for (const appointment of state.appointments) {
+      const next = state.appointments.find((other) => other.at > appointment.at);
+      if (!next) continue;
+      expect(appointment.at + appointment.minutes).toBeLessThanOrEqual(next.at);
+    }
+  });
+
+  it("puts the day back to 06:00 when it is restarted", () => {
+    const restarted = gameReducer(playUntilStuck(), { type: "RESTART_DAY" });
 
     expect(restarted.clock).toBe(0);
     expect(restarted.phase).toBe("day");

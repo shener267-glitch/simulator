@@ -2,7 +2,7 @@ import { PlaceScreen } from "../place/PlaceScreen";
 import { TalkRunner } from "../talk/TalkRunner";
 import { ActionRunner } from "./ActionRunner";
 import { AppointmentScreen } from "./AppointmentScreen";
-import { BriefingScreen } from "./BriefingScreen";
+import { MeetingScreen } from "../meeting/MeetingScreen";
 import { InterruptNotice } from "./InterruptNotice";
 import { WakeScene } from "./WakeScene";
 import type { RestingMode } from "../../types/mode";
@@ -16,9 +16,10 @@ function Base({ mode }: { mode: RestingMode }) {
       return <ActionRunner />;
     case "talk":
       return <TalkRunner />;
-    // ブリーフィングだけは日程表を出すので、専用の画面を持っている。
+    case "meeting":
+      return <MeetingScreen />;
     case "appointment":
-      return mode.appointmentId === "briefing" ? <BriefingScreen /> : <AppointmentScreen />;
+      return <AppointmentScreen />;
     // 「どのくらい？」は現在地の画面に重ねて出す。
     case "duration":
     case "place":

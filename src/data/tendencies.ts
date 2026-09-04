@@ -13,11 +13,11 @@ export interface Tendency {
 export const TENDENCIES: Tendency[] = [
   {
     flags: ["ignored-the-call"],
-    text: "官房長官からの朝の電話には出なかった。理由を知らないまま、繰り上がった席についた。",
+    text: "篠塚からの電話には出なかった。理由を知らないまま、繰り上がった席についた。",
   },
   {
-    flags: ["chased-the-report"],
-    text: "小さな記事一つを、そのままにしなかった。二人の秘書官に確かめさせている。",
+    flags: ["chased-the-objection"],
+    text: "囲みの五行を、そのままにしなかった。二人の秘書官に確かめさせている。",
   },
   {
     flags: ["asked-about-family", "talked-to-wife"],
@@ -36,8 +36,8 @@ export const TENDENCIES: Tendency[] = [
     text: "台所で少し話した。それだけの朝だったが、それだけの朝でもなかった。",
   },
   {
-    flags: ["knows-about-report"],
-    text: "報道には気づいた。そこから先に何をするかは、まだ決めていない。",
+    flags: ["knows-the-objection"],
+    text: "党内に異論があることには気づいた。そこから先に何をするかは、まだ決めていない。",
   },
 ];
 

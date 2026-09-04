@@ -85,7 +85,7 @@ export const YOUNGER_SON_TREE: TalkTree = {
   hint: "起きてきたところらしい",
   channel: "in-person",
   places: ["living"],
-  from: 120,
+  from: 60, // 07:00
   rootId: "root",
   nodes: [
     {

@@ -2,7 +2,7 @@ import { ScreenContainer } from "../shared/ScreenContainer";
 import { ConditionMeter } from "../shared/ConditionMeter";
 import { formatClock, formatDuration } from "../../engine/clock";
 import { describeCondition, fatigueGauge, hungerGauge } from "../../engine/condition";
-import { MORNING_DATE_STAMP } from "../../data/briefing";
+import { MORNING_DATE_STAMP } from "../../data/schedule";
 import { describeTendency } from "../../data/tendencies";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
 

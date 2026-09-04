@@ -1,4 +1,5 @@
 import type { Minutes } from "./clock";
+import type { MeetingStage } from "./meeting";
 
 /**
  * 何のセグメントを消化しているか。いまは行動だけだが、会話の返事も電話の
@@ -50,7 +51,25 @@ export type RestingMode =
       minutesSpent: Minutes;
       run: SegmentRun | null;
     }
-  | { kind: "appointment"; appointmentId: string };
+  | { kind: "appointment"; appointmentId: string }
+  /**
+   * 会議の最中（設計書15章）。枠は予定の側が持っているので、ここに持つのは
+   * 「どの段にいるか」と「もう何を聞いたか」、それに席についた時刻だけ。
+   */
+  | {
+      kind: "meeting";
+      appointmentId: string;
+      /**
+       * 席についた時刻。予定の開始時刻とは限らない — 割り込みに答えたあとなど、
+       * 少し遅れて座ることがある。一日の記録に会議を一行で出すために持つ。
+       */
+      startedAt: Minutes;
+      stage: MeetingStage;
+      /** 再生中の選択肢。stage が "reply" のときだけ入る。 */
+      showing: string | null;
+      /** この会議でもう聞いてしまった話題。 */
+      taken: string[];
+    };
 
 /**
  * いまどの画面にいるか。v0.1 は activeAction / activeAppointmentId /

@@ -1,7 +1,7 @@
 import { useState, type MouseEvent } from "react";
 import { formatClock } from "../../engine/clock";
 import { describeCondition } from "../../engine/condition";
-import { MORNING_DATE_STAMP, WAKE_BEATS } from "../../data/briefing";
+import { MORNING_DATE_STAMP, WAKE_BEATS } from "../../data/schedule";
 import { useTypewriter } from "../../hooks/useTypewriter";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
 
