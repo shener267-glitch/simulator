@@ -1,4 +1,5 @@
 import type { Concern } from "../types/concern";
+import { DAY_LENGTH } from "../types/clock";
 
 /**
  * 上から順に見て、当てはまったものを先頭から最大2件出す（`data/tendencies.ts`
@@ -56,6 +57,26 @@ export const CONCERNS: Concern[] = [
     from: 180, // 09:00
     until: 300,
     requiresFlags: ["read-economic-papers"],
+  },
+  {
+    id: "papers-still-there",
+    text: "読み切れなかった資料が、机の上に残っている。",
+    from: 840, // 帰宅してから
+    requiresFlags: ["skimmed-economic-papers"],
+    unlessFlags: ["read-economic-papers"],
+  },
+  {
+    id: "family-tonight",
+    text: "今日は家族と、ほとんど顔を合わせていない。",
+    from: 840,
+    unlessFlags: ["sat-with-family", "talked-to-wife"],
+  },
+  {
+    id: "tomorrow",
+    text: "明日も八時に迎えが来る。もう寝てもいい時間だ。",
+    from: 1020, // 23:00
+    // 出口は就寝そのもの。寝れば一日が終わり、寝なければ24:00でここも閉じる。
+    until: DAY_LENGTH,
   },
   {
     id: "speech",
