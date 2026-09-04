@@ -111,3 +111,17 @@ export function remainingToTarget(run: SegmentRun): Minutes | null {
 export function isSpent(state: GameState, action: Action): boolean {
   return state.spentActions.includes(action.id) || resumeIndex(state, action) >= action.segments.length;
 }
+
+/**
+ * いま始められるか、始められないなら何が理由か。押しても黙って何も起きない
+ * ボタンを作らないためにある — 場所も時間帯も、理由として画面に出す。
+ */
+export type Unavailable = "place" | "time" | "spent";
+
+export function blockedBecause(state: GameState, action: Action): Unavailable | null {
+  if (!action.places.includes(state.place)) return "place";
+  if (action.from !== undefined && state.clock < action.from) return "time";
+  if (action.until !== undefined && state.clock >= action.until) return "time";
+  if (isSpent(state, action)) return "spent";
+  return null;
+}

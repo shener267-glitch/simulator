@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { Modal } from "../shared/Modal";
 import { SheetRow } from "../shared/SheetRow";
-import { actionMinutesLeft, isSpent } from "../../engine/actions";
+import { actionMinutesLeft, blockedBecause, isSpent } from "../../engine/actions";
 import { formatClock, formatDuration } from "../../engine/clock";
 import { ITEMS, PHONE_APPS } from "../../data/items";
+import type { Action } from "../../types/action";
 import { daySchedule } from "../../engine/schedule";
 import { findAction } from "../../data/actions";
+import { talkableAt } from "../../engine/talk";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
 
-type View = "items" | "phone" | "calendar" | "messages" | "photos";
+type View = "items" | "phone" | "calls" | "calendar" | "messages" | "mail" | "photos";
 
 /**
  * 持ち物と、その中のスマートフォン（設計書17〜20章）。ニュースとSNSは
@@ -162,6 +164,54 @@ export function ItemSheet({ onClose }: { onClose: () => void }) {
     );
   }
 
+  if (view === "calls") {
+    // 「話す」からも掛けられるが、電話は電話にあるべきもの。同じ相手に
+    // 同じ会話が開くだけで、別の導線を作っているわけではない。
+    const reachable = talkableAt(state).filter((tree) => tree.channel === "phone");
+
+    return (
+      <Modal title="電話" onClose={onClose}>
+        {reachable.length === 0 ? (
+          <p className="px-1 py-2 text-[0.88rem] leading-[1.9] text-body-muted">
+            いま掛けられる相手はいない。
+          </p>
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {reachable.map((tree) => (
+              <SheetRow
+                key={tree.id}
+                emoji={tree.emoji}
+                label={tree.short}
+                note={tree.hint}
+                onClick={() => {
+                  dispatch({ type: "OPEN_TALK", treeId: tree.id });
+                  onClose();
+                }}
+              />
+            ))}
+          </div>
+        )}
+        <BackRow onBack={() => setView("phone")} />
+      </Modal>
+    );
+  }
+
+  if (view === "mail") {
+    return (
+      <Modal title="メール" onClose={onClose}>
+        <div className="flex flex-col gap-3">
+          <p className="px-1 text-[0.88rem] leading-[1.9] text-body-muted">
+            未読が四百件を超えている。就任祝いと、面会の申し込みと、名前に覚えのない団体からの陳情。
+          </p>
+          <p className="px-1 text-[0.88rem] leading-[1.9] text-body-muted">
+            返さなければならないものは、篠塚が別に紙で上げてくると言っていた。ここは、もう自分が見る場所ではないのだろう。
+          </p>
+        </div>
+        <BackRow onBack={() => setView("phone")} />
+      </Modal>
+    );
+  }
+
   if (view === "photos") {
     return (
       <Modal title="写真" onClose={onClose}>
@@ -177,26 +227,40 @@ export function ItemSheet({ onClose }: { onClose: () => void }) {
     <Modal title="スマートフォン" onClose={onClose}>
       <div className="flex flex-col gap-2.5">
         {PHONE_APPS.map((app) => {
-          const action = app.actionId ? findAction(app.actionId) : undefined;
-          const spent = action ? isSpent(state, action) : false;
+          // 時間帯で中身が変わるアプリは、いま始められる方を出す。朝は朝刊、
+          // 夜は夜のニュース。どちらも駄目なら、駄目な理由を出す。
+          const candidates = (app.actionIds ?? []).map(findAction).filter(Boolean) as Action[];
+          const action = candidates.find((candidate) => !blockedBecause(state, candidate));
+          const fallback = action ?? candidates[0];
+          const blocked = fallback ? blockedBecause(state, fallback) : null;
 
           return (
             <SheetRow
               key={app.id}
               emoji={app.emoji}
               label={app.label}
+              note={
+                blocked === "place"
+                  ? "ここでは見られない"
+                  : blocked === "time"
+                    ? "いまの時間は、まだ何も出ていない"
+                    : undefined
+              }
               meta={
-                action
-                  ? spent
+                fallback
+                  ? blocked === "spent"
                     ? "見終えた"
-                    : formatDuration(actionMinutesLeft(state, action))
+                    : blocked
+                      ? undefined
+                      : formatDuration(actionMinutesLeft(state, fallback))
                   : app.id === "messages" && state.phone.messages.length > 0
                     ? `${state.phone.messages.length}件`
                     : undefined
               }
-              disabled={Boolean(action) && spent}
+              disabled={Boolean(blocked)}
               onClick={() => {
                 if (action) return start(action.id);
+                if (fallback) return;
                 setView(app.id as View);
               }}
             />

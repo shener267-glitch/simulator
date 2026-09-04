@@ -12,21 +12,26 @@ export const ITEMS: Item[] = [
   { id: "papers", label: "手元の資料", emoji: "📄", hint: "枕元に置いたままの束" },
 ];
 
-export type PhoneAppId = "messages" | "news" | "sns" | "calendar" | "photos";
+export type PhoneAppId = "calls" | "messages" | "mail" | "news" | "sns" | "calendar" | "photos";
 
 export interface PhoneApp {
   id: PhoneAppId;
   label: string;
   emoji: string;
-  /** その場で始まる行動があれば、そのid。なければアプリ自身が画面を出す。 */
-  actionId?: string;
+  /**
+   * その場で始まる行動があれば、そのid。時間帯で中身が変わるものは複数書き、
+   * いま始められる最初のものを使う — 朝は朝刊、夜は夜のニュースになる。
+   */
+  actionIds?: string[];
 }
 
-/** v0.2で優先するのはSNS・メッセージ・ニュース（設計書18章）。 */
+/** 設計書18章。起床演出が見せる三つ（ニュース・メッセージ・メール）は全部ある。 */
 export const PHONE_APPS: PhoneApp[] = [
+  { id: "calls", label: "電話", emoji: "📞" },
   { id: "messages", label: "メッセージ", emoji: "💬" },
-  { id: "news", label: "ニュース", emoji: "📰", actionId: "news" },
-  { id: "sns", label: "SNS", emoji: "🌐", actionId: "sns" },
+  { id: "mail", label: "メール", emoji: "📧" },
+  { id: "news", label: "ニュース", emoji: "📰", actionIds: ["news", "news-evening"] },
+  { id: "sns", label: "SNS", emoji: "🌐", actionIds: ["sns"] },
   { id: "calendar", label: "カレンダー", emoji: "📅" },
   { id: "photos", label: "写真", emoji: "📷" },
 ];
