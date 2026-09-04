@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MorningScreen } from "../../src/components/morning/MorningScreen";
+import { DayScreen } from "../../src/components/morning/DayScreen";
 import { GameProvider } from "../../src/state/GameContext";
 import { WAKE_BEATS } from "../../src/data/briefing";
 
@@ -9,7 +9,7 @@ const LAST_BEAT = WAKE_BEATS.length - 1;
 function renderMorning() {
   return render(
     <GameProvider>
-      <MorningScreen />
+      <DayScreen />
     </GameProvider>,
   );
 }
@@ -39,7 +39,7 @@ function advanceTo(beat: number) {
   finishTyping();
 }
 
-describe("the 05:00 opening", () => {
+describe("the opening", () => {
   beforeEach(() => {
     window.localStorage.clear();
     vi.useFakeTimers();
@@ -53,7 +53,7 @@ describe("the 05:00 opening", () => {
   it("opens on the clock, with getting up still several beats away", () => {
     renderMorning();
 
-    expect(screen.getByText("05:00")).toBeInTheDocument();
+    expect(screen.getByText("06:00")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "起きる" })).not.toBeInTheDocument();
   });
 
@@ -95,6 +95,6 @@ describe("the 05:00 opening", () => {
     }
 
     // The morning proper: the opening costs nothing, so it is still 05:00.
-    expect(screen.getByText("05:00")).toBeInTheDocument();
+    expect(screen.getByText("06:00")).toBeInTheDocument();
   });
 });

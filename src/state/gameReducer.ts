@@ -1,10 +1,10 @@
-import { MORNING_LENGTH, type Minutes } from "../types/clock";
+import { DAY_LENGTH, type Minutes } from "../types/clock";
 import type { Action as FreeAction, ConditionDelta, Segment } from "../types/action";
 import type { GameState, InterruptChoice, LogEntry } from "../types/game";
 import type { RestingMode, SegmentRun, SegmentSource } from "../types/mode";
 import type { PlaceId } from "../types/place";
 import { durationOptions, interruptionGuard, isSpent, resumeIndex } from "../engine/actions";
-import { isMorningOver } from "../engine/clock";
+import { isDayOver } from "../engine/clock";
 import { applyElapsed, clampCondition } from "../engine/condition";
 import { travelMinutes } from "../engine/places";
 import { dueAppointment, dueInterrupt, moveAppointment } from "../engine/schedule";
@@ -45,7 +45,7 @@ export type GameAction =
   | { type: "END_TALK" }
   /** 後回しにした連絡を読む。読むにも時間はかかる。 */
   | { type: "READ_MESSAGE"; messageId: string }
-  | { type: "RESTART_MORNING" }
+  | { type: "RESTART_DAY" }
   | { type: "NEW_GAME" };
 
 /**
@@ -92,6 +92,11 @@ function pushMove(log: LogEntry[], label: string, minutes: Minutes, startedAt: M
   return [...log, { label, minutes, startedAt, move: true }];
 }
 
+/** 予定が終わる時刻。枠は開始時刻に固定されていて、着席の早い遅いでは動かない。 */
+function appointmentEnd(appointment: { at: Minutes; minutes: Minutes }): Minutes {
+  return appointment.at + appointment.minutes;
+}
+
 function addFlags(flags: string[], added?: string[]): string[] {
   if (!added?.length) return flags;
   const next = [...flags];
@@ -105,14 +110,14 @@ function addFlags(flags: string[], added?: string[]): string[] {
  * 読む間がなくなる。
  */
 function settleHard(state: GameState): GameState {
-  if (state.phase !== "morning") return state;
+  if (state.phase !== "day") return state;
 
   const appointment = dueAppointment(state, state.clock);
   if (appointment) {
     return { ...state, mode: { kind: "appointment", appointmentId: appointment.id } };
   }
 
-  if (isMorningOver(state.clock)) {
+  if (isDayOver(state.clock)) {
     return { ...state, phase: "review" };
   }
 
@@ -125,7 +130,7 @@ function settleHard(state: GameState): GameState {
  * 起きることなので、選択の結果に見えてはいけない。
  */
 function settleSoft(state: GameState): GameState {
-  if (state.phase !== "morning") return state;
+  if (state.phase !== "day") return state;
   // 起床中は鳴らさない。割り込みの入れ子も作らない。
   if (state.mode.kind === "wake" || state.mode.kind === "interrupt") return state;
   const resume: RestingMode = state.mode;
@@ -372,7 +377,10 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
       const appointment = state.appointments.find((candidate) => candidate.id === appointmentId);
       if (!appointment) return state;
 
-      const clock = Math.min(MORNING_LENGTH, state.clock + appointment.minutes);
+      // 予定は開始時刻からの固定枠として終わる。着席が一分遅れたぶんだけ
+      // 終わりまでずれると、八件並んだ一日では遅れが積み上がって時間割が
+      // 崩れる。08:20〜09:00の会議は、何分に座っても09:00に終わる。
+      const clock = Math.max(state.clock, Math.min(DAY_LENGTH, appointmentEnd(appointment)));
       const spent = clock - state.clock;
 
       return settle({
@@ -542,7 +550,7 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
       });
     }
 
-    case "RESTART_MORNING":
+    case "RESTART_DAY":
       return createInitialState(state.player);
 
     case "NEW_GAME":

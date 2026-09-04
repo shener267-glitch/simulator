@@ -30,7 +30,7 @@ function Base({ mode }: { mode: RestingMode }) {
  * 画面は mode ひとつで決まる。届いた連絡は下の画面を置き換えるのではなく、
  * その上に重ねる — 戻る先は mode.resume が覚えている。
  */
-export function MorningScreen() {
+export function DayScreen() {
   const state = useGameState();
   const mode = state.mode;
   const base = mode.kind === "interrupt" ? mode.resume : mode;

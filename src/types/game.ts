@@ -97,7 +97,7 @@ export interface LogEntry {
   move?: boolean;
 }
 
-export type Phase = "morning" | "review";
+export type Phase = "day" | "review";
 
 export interface GameState {
   saveVersion: number;

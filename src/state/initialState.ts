@@ -22,7 +22,7 @@ export function createInitialState(player?: GameState["player"]): GameState {
   return {
     saveVersion: SAVE_VERSION,
     clock: 0,
-    phase: "morning",
+    phase: "day",
     player: player ?? { ...PLAYER_DEFAULT_NAME },
     place: STARTING_PLACE,
     condition: { fatigue: 55, hunger: 45 },

@@ -230,7 +230,7 @@ describe("appointments, which are not negotiable", () => {
     expect(stopped.actionProgress.news).toBe(0);
   });
 
-  it("runs the briefing for its full half hour once the player sits down for it", () => {
+  it("ends the briefing when it is scheduled to end, not half an hour after sitting down", () => {
     let state = { ...withoutCall(awake()), clock: 120 };
     state = gameReducer(state, { type: "FINISH_WAKE" }); // すでに place なので何も起きない
     state = gameReducer({ ...state, mode: { kind: "place" } }, { type: "MOVE_TO", place: "corridor" });
@@ -238,7 +238,9 @@ describe("appointments, which are not negotiable", () => {
     expect(state.mode).toMatchObject({ kind: "appointment", appointmentId: "briefing" });
 
     state = gameReducer(state, { type: "RESOLVE_APPOINTMENT" });
-    expect(state.clock).toBe(151);
+    // 120分の予定を30分。廊下へ一分歩いてから座っても、終わりは150分のまま。
+    // 遅れがそのまま後ろへ伸びると、予定が並んだ一日で時間割が崩れていく。
+    expect(state.clock).toBe(150);
     expect(state.highlights).toContain("沢渡と篠塚から本日の日程の説明を受けた。");
   });
 });
@@ -269,7 +271,7 @@ describe("being taken to the 官邸", () => {
     );
   });
 
-  it("finishes the morning on the 官房長官 meeting, exactly at 08:00", () => {
+  it("runs the 官房長官 meeting out to 08:00 and carries on into the day", () => {
     let state = {
       ...resolved(withoutCall(at(awake(), "office")), "briefing", "kantei"),
       clock: 165,
@@ -280,7 +282,8 @@ describe("being taken to the 官邸", () => {
 
     state = gameReducer(state, { type: "RESOLVE_APPOINTMENT" });
     expect(state.clock).toBe(180);
-    expect(state.phase).toBe("review");
+    // 08:00はもう一日の終わりではない。ここから先が本番になる。
+    expect(state.phase).toBe("day");
   });
 });
 
@@ -503,7 +506,7 @@ describe("reading what was put off", () => {
 describe("the whole morning", () => {
   function playUntilReview() {
     let state = awake();
-    for (let guard = 0; guard < 400 && state.phase === "morning"; guard += 1) {
+    for (let guard = 0; guard < 400 && state.phase === "day"; guard += 1) {
       if (state.mode.kind === "interrupt") {
         state = state.mode.answered
           ? gameReducer(state, { type: "CLOSE_INTERRUPT" })
@@ -521,17 +524,19 @@ describe("the whole morning", () => {
       const available = actionsAt(state.place).find(
         (action) => !state.spentActions.includes(action.id),
       );
-      state = playThrough(state, available!.id);
+      // 一日ぶんの行動はまだ揃っていない。尽きたらそこで止める。
+      if (!available) break;
+      state = playThrough(state, available.id);
     }
     return state;
   }
 
-  it("ends at 08:00 with every minute accounted for in the log", () => {
+  it("accounts for every minute it spends", () => {
     const state = playUntilReview();
 
-    expect(state.phase).toBe("review");
-    expect(state.clock).toBe(180);
-    expect(totalLogged(state)).toBe(180);
+    // 一日を最後まで埋めるコンテンツはまだないが、使った分は必ずログに残る。
+    expect(state.clock).toBeGreaterThan(180);
+    expect(totalLogged(state)).toBe(state.clock);
   });
 
   it("always gets the call and the briefing in, however the time was spent", () => {
@@ -543,10 +548,10 @@ describe("the whole morning", () => {
   });
 
   it("puts the morning back to 05:00 when it is restarted", () => {
-    const restarted = gameReducer(playUntilReview(), { type: "RESTART_MORNING" });
+    const restarted = gameReducer(playUntilReview(), { type: "RESTART_DAY" });
 
     expect(restarted.clock).toBe(0);
-    expect(restarted.phase).toBe("morning");
+    expect(restarted.phase).toBe("day");
     expect(restarted.log).toHaveLength(0);
     expect(restarted.highlights).toHaveLength(0);
     expect(restarted.place).toBe("bedroom");

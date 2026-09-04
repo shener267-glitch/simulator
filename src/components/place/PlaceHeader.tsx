@@ -1,4 +1,4 @@
-import { MORNING_LENGTH } from "../../types/clock";
+import { DAY_LENGTH } from "../../types/clock";
 import { formatClock, formatDuration } from "../../engine/clock";
 import { visibleFreeMinutes } from "../../engine/actions";
 import { fatigueGauge } from "../../engine/condition";
@@ -18,7 +18,7 @@ export function PlaceHeader() {
   const place = placeById(state.place);
   const upcoming = nextVisibleAppointment(state);
   const untilNext = visibleFreeMinutes(state);
-  const elapsed = Math.min(100, (state.clock / MORNING_LENGTH) * 100);
+  const elapsed = Math.min(100, (state.clock / DAY_LENGTH) * 100);
 
   return (
     <div className="sticky top-0 z-10 -mx-5 border-b border-line bg-ink/90 px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))] backdrop-blur-md">

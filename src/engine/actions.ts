@@ -1,4 +1,4 @@
-import { MORNING_LENGTH, type Minutes } from "../types/clock";
+import { DAY_LENGTH, type Minutes } from "../types/clock";
 import type { Action, Segment } from "../types/action";
 import type { SegmentRun } from "../types/mode";
 import type { GameState } from "../types/game";
@@ -19,7 +19,7 @@ export function nextInterruption(state: GameState): Minutes | null {
 /** No stretch of free time may run past the next interruption, or past 08:00. */
 export function interruptionGuard(state: GameState): Minutes {
   const next = nextInterruption(state);
-  return next === null ? MORNING_LENGTH : Math.min(next, MORNING_LENGTH);
+  return next === null ? DAY_LENGTH : Math.min(next, DAY_LENGTH);
 }
 
 /** How long the player can keep going before something takes over. */
@@ -35,7 +35,7 @@ export function freeMinutes(state: GameState): Minutes {
  */
 export function visibleFreeMinutes(state: GameState): Minutes {
   const appointment = nextVisibleAppointment(state);
-  const limit = appointment ? Math.min(appointment.at, MORNING_LENGTH) : MORNING_LENGTH;
+  const limit = appointment ? Math.min(appointment.at, DAY_LENGTH) : DAY_LENGTH;
   return Math.max(0, limit - state.clock);
 }
 

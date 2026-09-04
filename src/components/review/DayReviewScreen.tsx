@@ -7,10 +7,10 @@ import { describeTendency } from "../../data/tendencies";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
 
 /**
- * 朝の記録。何が正しい使い方かは示さない — この朝をどう使ったかを
+ * 一日の記録。何が正しい使い方かは示さない — この朝をどう使ったかを
  * そのまま並べるだけにする（本セッションでの決定）。
  */
-export function MorningReviewScreen() {
+export function DayReviewScreen() {
   const state = useGameState();
   const dispatch = useGameDispatch();
   const total = state.log.reduce((sum, entry) => sum + entry.minutes, 0);
@@ -20,9 +20,9 @@ export function MorningReviewScreen() {
     <ScreenContainer width="narrow">
       <div className="pt-[calc(1.5rem+env(safe-area-inset-top))]">
         <p className="figures font-figure text-[0.65rem] font-medium tracking-label text-brass">
-          {MORNING_DATE_STAMP}　05:00 — 08:00
+          {MORNING_DATE_STAMP}　{formatClock(0)} — {formatClock(state.clock)}
         </p>
-        <h1 className="mt-3 text-[1.6rem] font-normal tracking-wide text-body">朝の記録</h1>
+        <h1 className="mt-3 text-[1.6rem] font-normal tracking-wide text-body">一日の記録</h1>
       </div>
 
       <section className="flex flex-col gap-2.5">
@@ -57,7 +57,7 @@ export function MorningReviewScreen() {
       {state.highlights.length > 0 && (
         <section className="flex flex-col gap-2.5">
           <div className="flex items-center gap-3">
-            <h2 className="text-[0.72rem] font-medium tracking-[0.2em] text-body-muted">この朝のこと</h2>
+            <h2 className="text-[0.72rem] font-medium tracking-[0.2em] text-body-muted">この日のこと</h2>
             <span className="h-px flex-1 bg-line" />
           </div>
           <ul className="flex flex-col gap-2">
@@ -98,7 +98,7 @@ export function MorningReviewScreen() {
         <section className="flex flex-col gap-2.5">
           <div className="flex items-center gap-3">
             <h2 className="text-[0.72rem] font-medium tracking-[0.2em] text-body-muted">
-              この朝の過ごし方
+              この日の過ごし方
             </h2>
             <span className="h-px flex-1 bg-line" />
           </div>
@@ -115,10 +115,10 @@ export function MorningReviewScreen() {
 
       <button
         type="button"
-        onClick={() => dispatch({ type: "RESTART_MORNING" })}
+        onClick={() => dispatch({ type: "RESTART_DAY" })}
         className="min-h-[52px] w-full rounded-xl border border-line-strong px-4 text-[0.95rem] font-medium text-body-muted transition-colors duration-200 hover:border-brass/40 hover:text-body active:bg-white/5"
       >
-        この朝をやり直す
+        この日をやり直す
       </button>
     </ScreenContainer>
   );

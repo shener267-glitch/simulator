@@ -1,13 +1,13 @@
 import { GameProvider, useGameState } from "./state/GameContext";
 import { useAutosave } from "./hooks/useAutosave";
-import { MorningScreen } from "./components/morning/MorningScreen";
-import { MorningReviewScreen } from "./components/review/MorningReviewScreen";
+import { DayScreen } from "./components/morning/DayScreen";
+import { DayReviewScreen } from "./components/review/DayReviewScreen";
 
 function Game() {
   const state = useGameState();
   useAutosave(state);
 
-  return state.phase === "review" ? <MorningReviewScreen /> : <MorningScreen />;
+  return state.phase === "review" ? <DayReviewScreen /> : <DayScreen />;
 }
 
 export default function App() {

@@ -1,30 +1,35 @@
 import { describe, expect, it } from "vitest";
-import { formatClock, formatDuration, isMorningOver, remainingMinutes } from "../../src/engine/clock";
-import { MORNING_LENGTH } from "../../src/types/clock";
+import { formatClock, formatDuration, isDayOver } from "../../src/engine/clock";
+import { DAY_LENGTH } from "../../src/types/clock";
 
-describe("clock", () => {
-  it("renders offsets from 05:00 as wall-clock labels", () => {
-    expect(formatClock(0)).toBe("05:00");
-    expect(formatClock(70)).toBe("06:10");
-    expect(formatClock(90)).toBe("06:30");
-    expect(formatClock(120)).toBe("07:00");
-    expect(formatClock(MORNING_LENGTH)).toBe("08:00");
+describe("the clock", () => {
+  it("reads offsets from 06:00 as wall-clock times", () => {
+    expect(formatClock(0)).toBe("06:00");
+    expect(formatClock(70)).toBe("07:10");
+    expect(formatClock(115)).toBe("07:55");
+    expect(formatClock(360)).toBe("12:00");
+    expect(formatClock(840)).toBe("20:00");
   });
 
-  it("formats durations in Japanese", () => {
+  it("calls the end of the day 24:00 rather than starting over at zero", () => {
+    expect(formatClock(DAY_LENGTH)).toBe("24:00");
+  });
+
+  it("wraps anything outside the day instead of printing 25:00", () => {
+    // 丸めがないと、範囲外はエラーも出さずに "25:00" や "-1:-10" になる。
+    expect(formatClock(DAY_LENGTH + 60)).toBe("01:00");
+    expect(formatClock(-60)).toBe("05:00");
+    expect(formatClock(-360)).toBe("00:00");
+  });
+
+  it("says how long something took", () => {
     expect(formatDuration(10)).toBe("10分");
     expect(formatDuration(60)).toBe("1時間");
     expect(formatDuration(95)).toBe("1時間35分");
   });
 
-  it("ends the morning at 08:00, not before", () => {
-    expect(isMorningOver(179)).toBe(false);
-    expect(isMorningOver(180)).toBe(true);
-  });
-
-  it("reports the minutes left in the phase", () => {
-    expect(remainingMinutes(0)).toBe(180);
-    expect(remainingMinutes(150)).toBe(30);
-    expect(remainingMinutes(200)).toBe(0);
+  it("ends the day at 24:00 and not a minute before", () => {
+    expect(isDayOver(DAY_LENGTH - 1)).toBe(false);
+    expect(isDayOver(DAY_LENGTH)).toBe(true);
   });
 });

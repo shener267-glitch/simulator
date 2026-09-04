@@ -7,6 +7,7 @@ import {
   visibleFreeMinutes,
 } from "../../src/engine/actions";
 import { gameReducer } from "../../src/state/gameReducer";
+import { DAY_LENGTH } from "../../src/types/clock";
 import { awake, playThrough } from "../testUtils";
 
 describe("interruption guard", () => {
@@ -18,7 +19,7 @@ describe("interruption guard", () => {
     expect(freeMinutes(state)).toBe(120);
   });
 
-  it("falls back to 08:00 once nothing is left on the schedule", () => {
+  it("falls back to the end of the day once nothing is left on the schedule", () => {
     const settled = {
       ...awake(),
       clock: 150,
@@ -27,8 +28,8 @@ describe("interruption guard", () => {
     };
 
     expect(nextInterruption(settled)).toBeNull();
-    expect(interruptionGuard(settled)).toBe(180);
-    expect(freeMinutes(settled)).toBe(30);
+    expect(interruptionGuard(settled)).toBe(DAY_LENGTH);
+    expect(freeMinutes(settled)).toBe(DAY_LENGTH - 150);
   });
 
   it("agrees with the countdown, because nothing in this morning cuts in unannounced", () => {
