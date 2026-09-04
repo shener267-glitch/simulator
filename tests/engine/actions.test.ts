@@ -3,12 +3,16 @@ import {
   freeMinutes,
   interruptionGuard,
   nextInterruption,
+  durationOptions,
+  durationRange,
+  formatRange,
   segmentFits,
   visibleFreeMinutes,
 } from "../../src/engine/actions";
+import { ACTIONS, findAction } from "../../src/data/actions";
 import { gameReducer } from "../../src/state/gameReducer";
 import { DAY_LENGTH } from "../../src/types/clock";
-import { awake, playThrough } from "../testUtils";
+import { awake } from "../testUtils";
 
 describe("interruption guard", () => {
   it("points at the next appointment, and at nothing softer", () => {
@@ -54,13 +58,12 @@ describe("interruption guard", () => {
   });
 
   it("counts down to the briefing once the call has moved it", () => {
-    let state = playThrough(awake(), "documents"); // 30分 → 05:30
-    state = playThrough(state, "ready"); // 20分 → 05:50
-    state = playThrough(state, "idle"); // 15分 → 06:05
-    state = gameReducer(state, { type: "START_ACTION", actionId: "news" }); // 06:20、着信
+    // 15分の資料を開くと着信の時刻を跨ぐ。切れ目で鳴り、そこで受ける。
+    let state = gameReducer({ ...awake(), clock: 65 }, { type: "START_ACTION", actionId: "documents" });
     state = gameReducer(state, { type: "ANSWER_INTERRUPT", choice: "defer" });
 
     expect(state.clock).toBe(80);
+    // 着信でブリーフィングが90分に繰り上がっている。
     expect(visibleFreeMinutes(state)).toBe(10);
   });
 
@@ -68,5 +71,36 @@ describe("interruption guard", () => {
     const state = { ...awake(), clock: 110 };
     expect(segmentFits(state, { minutes: 10, text: "" })).toBe(true);
     expect(segmentFits(state, { minutes: 15, text: "" })).toBe(false);
+  });
+});
+
+describe("how long an action says it takes", () => {
+  it("shows a range for every action the player can pick", () => {
+    for (const action of ACTIONS) {
+      const range = durationRange(awake(), action);
+      expect(range, action.id).not.toBeNull();
+      expect(range!.min).toBeGreaterThan(0);
+      expect(range!.max).toBeGreaterThanOrEqual(range!.min);
+    }
+  });
+
+  it("promises exactly the lengths it will offer, and no more", () => {
+    // 範囲は「いま決められる幅」。中身の総量ではない — SNSのように後ろが
+    // 長く続くものは、その先を「さらに続ける」で伸ばす。
+    for (const action of ACTIONS) {
+      const options = durationOptions(awake(), action);
+      const range = durationRange(awake(), action)!;
+      expect(range.min, action.id).toBe(options[0].minutes);
+      expect(range.max, action.id).toBe(options[options.length - 1].minutes);
+    }
+  });
+
+  it("matches the lengths the design asks for", () => {
+    const shown = (id: string) => formatRange(durationRange(awake(), findAction(id)!)!);
+    expect(shown("ready")).toBe("10〜20分");
+    expect(shown("nap")).toBe("15〜30分");
+    expect(shown("documents")).toBe("15〜40分");
+    expect(shown("news")).toBe("5〜15分");
+    expect(shown("idle")).toBe("15分");
   });
 });

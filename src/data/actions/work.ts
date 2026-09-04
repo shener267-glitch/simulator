@@ -11,7 +11,7 @@ export const READ_DOCUMENTS: Action = {
   perSegment: { fatigue: 2 },
   segments: [
     {
-      minutes: 10,
+      minutes: 15,
       text: "内閣の顔ぶれと担当分野の一覧。昨日決めたばかりなのに、もう覚束ない名前がある。",
       lines: [
         "十九名。派閥の均衡、当選回数、専門分野。決めたときの理屈はすべて思い出せる。",
@@ -27,7 +27,7 @@ export const READ_DOCUMENTS: Action = {
       ],
     },
     {
-      minutes: 10,
+      minutes: 15,
       text: "経済指標の概況。数字だけが並んだ紙を、目で追う。",
       lines: [
         "実質成長率、消費者物価、実質賃金。どれも急に良くも悪くもなっていない。",

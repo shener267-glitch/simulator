@@ -1,7 +1,6 @@
 import { Modal } from "../shared/Modal";
 import { SheetRow } from "../shared/SheetRow";
-import { actionMinutesLeft, isSpent, resumeIndex } from "../../engine/actions";
-import { formatDuration } from "../../engine/clock";
+import { durationRange, formatRange, isSpent, resumeIndex } from "../../engine/actions";
 import { actionsAt } from "../../engine/places";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
 
@@ -21,6 +20,7 @@ export function ActionSheet({ onClose }: { onClose: () => void }) {
         {actions.map((action) => {
           const spent = isSpent(state, action);
           const resumed = !spent && resumeIndex(state, action) > 0;
+          const range = durationRange(state, action);
 
           return (
             <SheetRow
@@ -28,7 +28,8 @@ export function ActionSheet({ onClose }: { onClose: () => void }) {
               emoji={action.emoji}
               label={action.label}
               note={spent ? "もう出てこない" : resumed ? `続きから — ${action.hint}` : action.hint}
-              meta={spent ? "済んだ" : formatDuration(actionMinutesLeft(state, action))}
+              // 所要時間は必ず範囲で見せる（設計書6章）。
+              meta={spent || !range ? "済んだ" : formatRange(range)}
               disabled={spent}
               onClick={() => {
                 dispatch({ type: "CHOOSE_ACTION", actionId: action.id });

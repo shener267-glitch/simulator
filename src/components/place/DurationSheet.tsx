@@ -32,8 +32,10 @@ export function DurationSheet() {
             key={option.minutes}
             emoji={action.emoji}
             label={formatDuration(option.minutes)}
-            note={option.available ? undefined : "次の予定に間に合わない"}
-            disabled={!option.available}
+            // 入らない長さも選べる。警告して、あとは本人に決めさせる（設計書6章）。
+            // 跨いだぶんは既存の中断ルールが切って、消化した分だけを課金する。
+            note={option.available ? undefined : "次の予定に間に合わない可能性があります"}
+            warn={!option.available}
             onClick={() =>
               dispatch({
                 type: "START_ACTION",

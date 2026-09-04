@@ -8,6 +8,8 @@ interface SheetRowProps {
   /** 右端。所要時間など。 */
   meta?: ReactNode;
   disabled?: boolean;
+  /** 選べるが、選ぶと何かを踏む。押せなくはしない。 */
+  warn?: boolean;
   onClick?: () => void;
 }
 
@@ -16,7 +18,7 @@ interface SheetRowProps {
  * 選べないものは消さずに薄く出す — 「あるが、いまは選べない」ことが
  * 分かるようにするため（設計書6章）。
  */
-export function SheetRow({ emoji, label, note, meta, disabled, onClick }: SheetRowProps) {
+export function SheetRow({ emoji, label, note, meta, disabled, warn, onClick }: SheetRowProps) {
   return (
     <button
       type="button"
@@ -25,7 +27,9 @@ export function SheetRow({ emoji, label, note, meta, disabled, onClick }: SheetR
       className={`group flex min-h-[56px] w-full items-center gap-3.5 rounded-xl border px-4 py-3 text-left transition-colors duration-200 ${
         disabled
           ? "cursor-not-allowed border-line/50 opacity-45"
-          : "border-line bg-ink-panel hover:border-brass/40 hover:bg-ink-raised active:bg-ink-raised"
+          : warn
+            ? "border-alert/40 bg-ink-panel hover:border-alert hover:bg-ink-raised active:bg-ink-raised"
+            : "border-line bg-ink-panel hover:border-brass/40 hover:bg-ink-raised active:bg-ink-raised"
       }`}
     >
       <span className="shrink-0 text-[1.15rem]" aria-hidden>
@@ -34,7 +38,13 @@ export function SheetRow({ emoji, label, note, meta, disabled, onClick }: SheetR
 
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[0.95rem] font-medium text-body">{label}</span>
-        {note && <span className="mt-0.5 block truncate text-[0.75rem] text-body-muted">{note}</span>}
+        {note && (
+          <span
+            className={`mt-0.5 block truncate text-[0.75rem] ${warn ? "text-alert" : "text-body-muted"}`}
+          >
+            {note}
+          </span>
+        )}
       </span>
 
       {meta && (

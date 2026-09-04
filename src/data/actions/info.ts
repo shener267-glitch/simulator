@@ -16,7 +16,7 @@ export const WATCH_NEWS: Action = {
   perSegment: { fatigue: 1 },
   segments: [
     {
-      minutes: 15,
+      minutes: 5,
       text: "テレビをつける。どの局も昨日の内閣発足から始まっている。",
       lines: [
         "「昨日、第◯代内閣総理大臣に指名され、夜には初閣議が開かれました」",
@@ -25,7 +25,7 @@ export const WATCH_NEWS: Action = {
       ],
     },
     {
-      minutes: 15,
+      minutes: 5,
       text: "民放の朝の番組に変える。街頭インタビューが流れていた。",
       lines: [
         "「まあ、やってみないと分からないですよね」と中年の男性。",
@@ -34,7 +34,7 @@ export const WATCH_NEWS: Action = {
       ],
     },
     {
-      minutes: 15,
+      minutes: 5,
       text: "朝刊を広げる。各紙の一面が並ぶと、同じ出来事とは思えない。",
       lines: [
         "一紙は「新内閣発足 経済再建へ」と大きく取っている。",
@@ -43,7 +43,7 @@ export const WATCH_NEWS: Action = {
       ],
     },
     {
-      minutes: 15,
+      minutes: 5,
       text: "政治面をめくる。組閣関連の記事の隅に、小さなベタ記事があった。",
       // ここで気づいておくと、秘書官に振れる話題が増える（設計書27章）。
       flags: ["knows-about-report"],
@@ -72,7 +72,7 @@ export const CHECK_SNS: Action = {
   perSegment: { fatigue: 1 },
   segments: [
     {
-      minutes: 10,
+      minutes: 5,
       text: "タイムラインを開く。昨日の話題がまだ流れている。",
       lines: [
         "@seiji_watch　新内閣の顔ぶれ、思っていたより若い。国交と厚労は意外だった",
@@ -81,7 +81,7 @@ export const CHECK_SNS: Action = {
       ],
     },
     {
-      minutes: 10,
+      minutes: 5,
       text: "指を止めずに下へ送る。",
       lines: [
         "@tokyo_kisha　官邸番です。昨夜の会見、記者クラブの空気は悪くなかったと思う",

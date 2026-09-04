@@ -85,6 +85,21 @@ export function durationOptions(state: GameState, action: Action): DurationOptio
   return options;
 }
 
+/**
+ * 一覧に出す「○〜○分」（設計書6章）。**選べる長さの幅**であって、中身の
+ * 総量ではない。SNSのように後ろが長く続くものは、その先を「さらに続ける」で
+ * 伸ばせる — 最初に約束するのは、いま決められる範囲だけにしておく。
+ */
+export function durationRange(state: GameState, action: Action): { min: Minutes; max: Minutes } | null {
+  const options = durationOptions(state, action);
+  if (options.length === 0) return null;
+  return { min: options[0].minutes, max: options[options.length - 1].minutes };
+}
+
+export function formatRange(range: { min: Minutes; max: Minutes }): string {
+  return range.min === range.max ? `${range.min}分` : `${range.min}〜${range.max}分`;
+}
+
 /** 目安に届くまであと何分か。届いていれば null。 */
 export function remainingToTarget(run: SegmentRun): Minutes | null {
   if (run.targetMinutes === null) return null;

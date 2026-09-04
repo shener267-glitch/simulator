@@ -425,8 +425,10 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
       if (!action) return state;
 
       const target = gameAction.targetMinutes ?? null;
-      // 次の予定に入らない長さは選べない。押せてしまう経路も塞いでおく。
-      if (target !== null && !durationOptions(state, action).some((o) => o.minutes === target && o.available)) {
+      // 差し出した長さかどうかだけを確かめる。次の予定に入るかどうかは見ない —
+      // 入らない長さも警告のうえで選べる（設計書6章）。跨いだぶんは中断の
+      // ルールが切って、消化した分だけを課金する。
+      if (target !== null && !durationOptions(state, action).some((o) => o.minutes === target)) {
         return state;
       }
 
