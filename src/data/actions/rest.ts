@@ -72,7 +72,7 @@ export const TAKE_SHOWER: Action = {
   places: ["bath"],
   hint: "頭の芯まで起こす",
   /** 朝のもの。夜は「風呂に入る」になるので、ここには出さない。 */
-  until: 840,
+  until: 720,
   perSegment: { fatigue: -6 },
   segments: [
     {

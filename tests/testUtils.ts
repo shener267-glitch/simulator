@@ -4,7 +4,8 @@ import type { PlaceId } from "../src/types/place";
 import { runOf } from "../src/types/mode";
 import { gameReducer, type GameAction } from "../src/state/gameReducer";
 import { createInitialState } from "../src/state/initialState";
-import { neighboursOf } from "../src/data/places";
+import { neighboursOf, placeById } from "../src/data/places";
+import { EARLIEST_DEPARTURE, canLeaveKantei } from "../src/engine/leaving";
 import { applyElapsed } from "../src/engine/condition";
 
 export function run(state: GameState, ...actions: GameAction[]): GameState {
@@ -75,8 +76,13 @@ export function waitForNextAppointment(state: GameState): GameState {
   const pending = state.appointments.filter((appointment) => !appointment.resolved);
   const step = neighboursOf(state.place)[0];
   if (!step) return state;
-  // 予定が尽きていたら、あとは寝るだけ。寝室まで一部屋ずつ歩く。
+  // 予定が尽きていたら、帰って寝るだけ。官邸にいるなら車を回す。
   if (pending.length === 0) {
+    if (canLeaveKantei(state)) return gameReducer(state, { type: "LEAVE_KANTEI" });
+    if (placeById(state.place).building === "kantei") {
+      // まだ18:00前。執務室で時間を進めるしかない。
+      return { ...state, clock: EARLIEST_DEPARTURE, condition: applyElapsed(state.condition, EARLIEST_DEPARTURE - state.clock, EARLIEST_DEPARTURE) };
+    }
     return gameReducer(state, { type: "MOVE_TO", place: towardsBedroom(state.place) });
   }
   const next = pending.reduce((soonest, a) => (a.at < soonest.at ? a : soonest));

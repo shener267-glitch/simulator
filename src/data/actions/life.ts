@@ -1,9 +1,10 @@
 import type { Action } from "../../types/action";
 import { ANYWHERE } from "../places";
-import { WIFE, YOUNGER_SON } from "../characters";
+import { YOUNGER_SON } from "../characters";
 
 /** 20:00前後。宿舎に戻ってからのもの。 */
-const EVENING = 840;
+/** 官邸を出られる時刻。早く帰れば、その分だけ夜が長い。 */
+const EVENING = 720;
 
 export const CHANGE_CLOTHES: Action = {
   id: "change",
@@ -69,43 +70,6 @@ export const SHORT_BREAK: Action = {
   ],
 };
 
-export const TALK_TO_WIFE_EVENING: Action = {
-  id: "wife-evening",
-  label: `${WIFE.name}と話す`,
-  category: "life",
-  emoji: "🫖",
-  places: ["living"],
-  hint: "今日のことを、少しだけ",
-  from: EVENING,
-  perSegment: { fatigue: -6 },
-  segments: [
-    {
-      minutes: 10,
-      text: "茶を淹れてくれた。向かいに座って、テレビの方を見ている。",
-      speaker: WIFE.name,
-      flags: ["talked-to-wife-tonight"],
-      lines: [
-        "「今日、テレビに出てた。朝の、玄関のとこ」",
-        "「短かったよ」と言うと、「短い方がいいよ」と返ってきた。",
-        "「長いと、あんた、余計なこと言うから」",
-      ],
-    },
-    {
-      minutes: 10,
-      text: "こちらから聞く。「大変じゃないか。取材とか、来るだろう」",
-      speaker: WIFE.name,
-      flags: ["asked-about-family"],
-      lines: [
-        "「来た。三件。全部断った」",
-        "「断っていいのか」と聞くと、少しこちらを見た。",
-        "「私は選ばれてないもん」",
-        "その言い方に、責める色はなかった。事実を言っただけだった。それが少しこたえた。",
-      ],
-      highlight: "夜、咲希と向かい合って話した。",
-    },
-  ],
-};
-
 export const TALK_TO_SON_EVENING: Action = {
   id: "son-evening",
   label: `${YOUNGER_SON.name}と話す`,
@@ -136,6 +100,5 @@ export const LIFE_ACTIONS: Action[] = [
   CHANGE_CLOTHES,
   SNACK,
   SHORT_BREAK,
-  TALK_TO_WIFE_EVENING,
   TALK_TO_SON_EVENING,
 ];

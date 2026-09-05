@@ -9,7 +9,7 @@ import { ELDER_SON, WIFE } from "../characters";
  * 扱う。五分で済む一本が、午後の会議一つを不要にすることがある。
  */
 
-const AT_THE_KANTEI = 840;
+
 
 export const CALL_CHIEF: Action = {
   id: "call-chief",
@@ -19,7 +19,6 @@ export const CALL_CHIEF: Action = {
   places: ["office", "study"],
   hint: "午後の会見で何を聞かれそうか",
   from: 140, // 官邸に入ってから
-  until: AT_THE_KANTEI,
   perSegment: { fatigue: 1 },
   segments: [
     {
@@ -54,7 +53,6 @@ export const CALL_MINISTER: Action = {
   places: ["office"],
   hint: "昨日決めたばかりの顔ぶれ",
   from: 140,
-  until: AT_THE_KANTEI,
   repeatable: true,
   perSegment: { fatigue: 2 },
   segments: [

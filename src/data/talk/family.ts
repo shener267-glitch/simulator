@@ -14,6 +14,53 @@ export const WIFE_TREE: TalkTree = {
   rootId: "root",
   nodes: [
     {
+      // 帰宅後は別の節を出す。朝と夜で同じ挨拶をされるのは、いちばん
+      // 「作り物」に見えるところだった（本セッションでの決定）。
+      id: "root",
+      requiresFlag: "left-the-kantei",
+      prompt: "「おかえり。ごはん、温め直そうか」",
+      choices: [
+        {
+          kind: "topic",
+          id: "evening-today",
+          label: "今日のことを話す",
+          once: true,
+          flags: ["talked-to-wife-tonight"],
+          reply: {
+            minutes: 10,
+            speaker: WIFE.name,
+            text: "「今日、テレビに出てた。朝の、玄関のとこ」\n\n短かったよ、と言うと、「短い方がいいよ」と返ってきた。\n\n「長いと、あんた、余計なこと言うから」",
+            highlight: "夜、咲希と今日のことを話した。",
+          },
+        },
+        {
+          kind: "topic",
+          id: "evening-press",
+          label: "取材が来ていないかを聞く",
+          once: true,
+          flags: ["asked-about-family", "talked-to-wife-tonight"],
+          reply: {
+            minutes: 10,
+            speaker: WIFE.name,
+            text: "「来た。三件。全部断った」\n\n断っていいのか、と聞くと、少しこちらを見た。\n\n「私は選ばれてないもん」\n\n責める色はなかった。事実を言っただけだった。それが少しこたえた。",
+          },
+        },
+        {
+          kind: "topic",
+          id: "evening-quiet",
+          label: "何も話さずに、隣に座る",
+          once: true,
+          flags: ["sat-with-family"],
+          reply: {
+            minutes: 10,
+            text: "テレビの音だけがしている。天気予報が終わって、通販が始まった。\n\n十分ほど、二人とも何も言わなかった。\n\n「寝れば」と言われて、立ち上がった。それだけの十分だった。",
+            highlight: "夜、居間で何も話さずに十分過ごした。",
+          },
+        },
+        { kind: "end", id: "evening-leave", label: "台所を出る" },
+      ],
+    },
+    {
       id: "root",
       prompt: "「起きたの。もう少し寝てるかと思った」",
       choices: [

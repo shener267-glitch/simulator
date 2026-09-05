@@ -6,13 +6,14 @@ import type { PlaceId } from "../types/place";
 import { durationOptions, interruptionGuard, isSpent, resumeIndex } from "../engine/actions";
 import { isDayOver } from "../engine/clock";
 import { canGoToBed, carriedFatigue } from "../engine/sleep";
+import { RIDE_MINUTES, canLeaveKantei } from "../engine/leaving";
 import { applyElapsed, clampCondition } from "../engine/condition";
 import { travelMinutes } from "../engine/places";
 import { dueAppointment, dueInterrupt, moveAppointment } from "../engine/schedule";
 import { findMeeting, offeredChoices } from "../engine/meeting";
 import { choicesAt, reachMinutes, reachableFrom } from "../engine/talk";
 import { nodeOf, choiceOf } from "../types/talk";
-import { placeById } from "../data/places";
+import { DORMITORY_ARRIVAL, placeById } from "../data/places";
 import { findTree } from "../data/talk";
 import { findAction } from "../data/actions";
 import { createInitialState } from "./initialState";
@@ -55,6 +56,8 @@ export type GameAction =
   | { type: "END_MEETING" }
   /** 後回しにした連絡を読む。読むにも時間はかかる。 */
   | { type: "READ_MESSAGE"; messageId: string }
+  /** 官邸を出る。18:00以降、予定が残っていなければいつでも（本セッションでの決定）。 */
+  | { type: "LEAVE_KANTEI" }
   | { type: "GO_TO_BED" }
   | { type: "RESTART_DAY" }
   | { type: "NEW_GAME" };
@@ -608,7 +611,7 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
     case "TALK_GOTO": {
       if (state.mode.kind !== "talk" || state.mode.run) return state;
       const tree = findTree(state.mode.treeId);
-      if (!tree || !nodeOf(tree, gameAction.nodeId)) return state;
+      if (!tree || !nodeOf(tree, gameAction.nodeId, state.flags)) return state;
       return { ...state, mode: { ...state.mode, nodeId: gameAction.nodeId } };
     }
 
@@ -616,7 +619,7 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
       if (state.mode.kind !== "talk" || state.mode.run) return state;
       const mode = state.mode;
       const tree = findTree(mode.treeId);
-      const node = tree && nodeOf(tree, mode.nodeId);
+      const node = tree && nodeOf(tree, mode.nodeId, state.flags);
       if (!tree || !node) return state;
 
       const choice = choicesAt(state, tree, node).find(
@@ -689,6 +692,21 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
                 { label: `${message.from}からのメッセージ`, minutes: spent, startedAt: state.clock },
               ]
             : state.log,
+      });
+    }
+
+    case "LEAVE_KANTEI": {
+      if (!canLeaveKantei(state)) return state;
+      const arrived = state.clock + RIDE_MINUTES;
+
+      return settle({
+        ...state,
+        clock: arrived,
+        place: DORMITORY_ARRIVAL,
+        condition: applyElapsed(state.condition, RIDE_MINUTES, arrived),
+        flags: addFlags(state.flags, ["left-the-kantei"]),
+        log: [...state.log, { label: "官邸発", minutes: RIDE_MINUTES, startedAt: state.clock, move: true }],
+        highlights: [...state.highlights, "議員宿舎に帰り着いた。"],
       });
     }
 

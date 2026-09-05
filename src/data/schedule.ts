@@ -80,15 +80,6 @@ export const APPOINTMENTS: Appointment[] = [
     minutes: 40,
     resolved: false,
   },
-  {
-    id: "return",
-    label: "官邸発",
-    at: 840, // 20:00
-    minutes: 1,
-    resolved: false,
-    movesTo: "living",
-    highlight: "議員宿舎に帰り着いた。",
-  },
 ];
 
 /**
@@ -116,19 +107,6 @@ export const APPOINTMENT_SCENES: Record<string, SceneLine[]> = {
     {
       speaker: SAWATARI.shortName,
       text: "「公邸への引っ越しは、落ち着いてからで結構です。当面はここから通っていただきます」",
-    },
-  ],
-  return: [
-    {
-      text: "官邸の玄関を出る。夜になっても、まだ生ぬるい風だった。\n\n車に乗り込むと、一分もしないうちに宿舎に着いた。近いということが、今日は初めて有難く感じられた。",
-    },
-    {
-      speaker: SAWATARI.shortName,
-      text: "「お疲れさまでした。明日は八時にお迎えに上がります」",
-      unlessFlag: "long-day",
-    },
-    {
-      text: "部屋に入る。静かだった。",
     },
   ],
 };

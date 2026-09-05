@@ -8,7 +8,7 @@ import { SHINOZUKA } from "../characters";
  * 説明がある。呼べば来るし、呼ばなければ来ない — 呼ばなかった分は、後で
  * 知らないまま判断することになる。
  */
-const LEAVES = 840;
+
 
 export const BRIEFING_SHORT: Action = {
   id: "brief-short",
@@ -18,7 +18,6 @@ export const BRIEFING_SHORT: Action = {
   places: ["office"],
   hint: "秘書官室に、待っている人がいる",
   from: 140,
-  until: LEAVES,
   repeatable: true,
   perSegment: { fatigue: 2 },
   segments: [
@@ -62,7 +61,6 @@ export const ASK_SECRETARY_WORK: Action = {
   places: ["office", "secretariat"],
   hint: "自分でやらずに済ませる",
   from: 140,
-  until: LEAVES,
   repeatable: true,
   perSegment: { fatigue: -1 },
   segments: [

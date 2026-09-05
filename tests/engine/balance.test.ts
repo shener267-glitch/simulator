@@ -48,7 +48,7 @@ interface DayResult {
   peakFatigue: number;
   peakHunger: number;
   lowestFatigue: number;
-  /** 官邸を出た20:00時点の状態。二つの遊び方を同じ地点で比べるために取る。 */
+  /** 官邸を出た時点の状態。二つの遊び方を、同じ出来事の地点で比べるために取る。 */
   atReturn: { fatigue: number; hunger: number } | null;
 }
 
@@ -67,7 +67,7 @@ function playDay(preference: string[], bedtime = 960): DayResult {
     peakFatigue = Math.max(peakFatigue, state.condition.fatigue);
     peakHunger = Math.max(peakHunger, state.condition.hunger);
     lowestFatigue = Math.min(lowestFatigue, state.condition.fatigue);
-    if (atReturn === null && state.clock >= 840) {
+    if (atReturn === null && state.flags.includes("left-the-kantei")) {
       atReturn = { fatigue: state.condition.fatigue, hunger: state.condition.hunger };
     }
 
@@ -181,14 +181,16 @@ describe("一日を通したバランス", () => {
   });
 
   it("has enough to do that the evening is not spent waiting for midnight", () => {
-    // 20:00に帰ってから寝るまでの四時間を、行動で埋めきれること。
+    // 帰ってから寝るまでを、行動で埋めきれること。
     const { end } = playDay(STEADY);
+    const leftAt = end.log.find((entry) => entry.label === "官邸発")?.startedAt ?? 0;
 
-    expect(end.clock).toBeGreaterThan(960);
+    expect(leftAt).toBeGreaterThanOrEqual(720);
+    expect(end.clock).toBeGreaterThan(leftAt + 120);
     expect(end.clock).toBeLessThanOrEqual(DAY_LENGTH);
     expect(end.sleep?.forced).toBe(false);
     // 夜の記録が、帰宅の一行だけということにはならない。
-    const night = end.log.filter((entry) => entry.startedAt >= 840);
+    const night = end.log.filter((entry) => entry.startedAt >= leftAt);
     expect(night.length).toBeGreaterThan(3);
   });
 });

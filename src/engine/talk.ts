@@ -61,13 +61,14 @@ export function choicesAt(state: GameState, tree: TalkTree, node: TalkNode): Tal
     if (choice.kind !== "topic") return true;
     if (choice.once && used.includes(choice.id)) return false;
     if (choice.requiresFlag && !state.flags.includes(choice.requiresFlag)) return false;
+    if (choice.unlessFlag && state.flags.includes(choice.unlessFlag)) return false;
     return true;
   });
 }
 
 /** その枝に、まだ聞けることが残っているか。空の枝は入口ごと畳む。 */
 export function hasSomethingLeft(state: GameState, tree: TalkTree, nodeId: string): boolean {
-  const node = nodeOf(tree, nodeId);
+  const node = nodeOf(tree, nodeId, state.flags);
   if (!node) return false;
   return choicesAt(state, tree, node).some((choice) => choice.kind === "topic");
 }

@@ -13,6 +13,8 @@ export type TalkChoice =
       once?: boolean;
       /** このフラグが立っていて初めて出る話題（設計書27章の情報の連鎖）。 */
       requiresFlag?: string;
+      /** このフラグが立っていたら出ない話題。朝の話は夜には出さない。 */
+      unlessFlag?: string;
       /** 選んだことで積む性格フラグ（設計書28章）。 */
       flags?: string[];
     }
@@ -24,6 +26,12 @@ export interface TalkNode {
   /** 選択肢の上に出す一行。 */
   prompt?: string;
   choices: TalkChoice[];
+  /**
+   * 同じidの節を複数置いて、フラグで出し分けられる。朝と夜で同じ人が同じ
+   * ことを言うのを避けるために使う（本セッションでの決定）。
+   */
+  requiresFlag?: string;
+  unlessFlag?: string;
 }
 
 export interface TalkTree {
@@ -43,8 +51,17 @@ export interface TalkTree {
   nodes: TalkNode[];
 }
 
-export function nodeOf(tree: TalkTree, nodeId: string): TalkNode | undefined {
-  return tree.nodes.find((node) => node.id === nodeId);
+/**
+ * その節。同じidが複数あれば、フラグの条件に合う最初のものを返す —
+ * 条件つきを先に書き、条件なしを後ろに置く。
+ */
+export function nodeOf(tree: TalkTree, nodeId: string, flags: string[] = []): TalkNode | undefined {
+  return tree.nodes.find(
+    (node) =>
+      node.id === nodeId &&
+      (!node.requiresFlag || flags.includes(node.requiresFlag)) &&
+      (!node.unlessFlag || !flags.includes(node.unlessFlag)),
+  );
 }
 
 export function choiceOf(tree: TalkTree, choiceId: string): TalkChoice | undefined {

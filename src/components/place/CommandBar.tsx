@@ -1,7 +1,8 @@
 import { canGoToBed } from "../../engine/sleep";
+import { canLeaveKantei } from "../../engine/leaving";
 import { useGameState } from "../../state/GameContext";
 
-export type CommandId = "act" | "talk" | "move" | "item" | "bed";
+export type CommandId = "act" | "talk" | "move" | "item" | "bed" | "leave";
 
 const COMMANDS: { id: CommandId; emoji: string; label: string }[] = [
   { id: "act", emoji: "💪", label: "行動" },
@@ -19,7 +20,20 @@ export function CommandBar({ onOpen }: { onOpen: (command: CommandId) => void })
 
   return (
     <div className="sticky bottom-0 -mx-5 mt-5 border-t border-line bg-ink/90 px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 backdrop-blur-md">
-      {/* 寝るのは四つの入口とは別。夜、寝室にいて、予定が残っていないときだけ出す。 */}
+      {/* 帰るのも寝るのも四つの入口とは別。一日を閉じにいく手なので分けてある。 */}
+      {canLeaveKantei(state) && (
+        <button
+          type="button"
+          onClick={() => onOpen("leave")}
+          className="mb-2.5 flex min-h-[56px] w-full items-center justify-center gap-2.5 rounded-xl border border-brass/40 bg-ink-panel text-[0.95rem] font-medium text-body transition-colors duration-200 hover:border-brass hover:bg-ink-raised active:bg-ink-raised"
+        >
+          <span className="text-[1.15rem]" aria-hidden>
+            🚗
+          </span>
+          官邸を出る
+        </button>
+      )}
+
       {canGoToBed(state) && (
         <button
           type="button"

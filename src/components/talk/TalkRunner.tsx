@@ -19,7 +19,7 @@ export function TalkRunner() {
   const mode = state.mode;
 
   const tree = findTree(mode.treeId);
-  const node = tree && nodeOf(tree, mode.nodeId);
+  const node = tree && nodeOf(tree, mode.nodeId, state.flags);
   if (!tree || !node) return null;
 
   // 返事を再生中なら、その話題。話題を選んでいる最中なら undefined。

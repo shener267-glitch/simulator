@@ -14,7 +14,7 @@ export const WATCH_NEWS: Action = {
   places: ["bedroom", "living", "study"],
   hint: "テレビと朝刊。世の中が昨日をどう受け取ったか",
   /** 朝刊は朝にしかない。夜は別の行動（夜のニュース）になる。 */
-  until: 840,
+  until: 720,
   perSegment: { fatigue: 1 },
   segments: [
     {

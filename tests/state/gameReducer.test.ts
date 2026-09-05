@@ -9,6 +9,7 @@ import { canGoToBed } from "../../src/engine/sleep";
 import { DAY_LENGTH } from "../../src/types/clock";
 import { choicesAt, reachableFrom } from "../../src/engine/talk";
 import { findTree } from "../../src/data/talk";
+import { nodeOf } from "../../src/types/talk";
 import { findAction } from "../../src/data/actions";
 import {
   at,
@@ -778,8 +779,10 @@ describe("the whole day", () => {
     expect(state.phase).toBe("review");
     expect(state.sleep).not.toBeNull();
     expect(state.sleep?.forced).toBe(false);
-    expect(state.clock).toBeGreaterThanOrEqual(840);
+    // 帰る時刻は自分で決める。18:00より前に寝ることはない。
+    expect(state.clock).toBeGreaterThanOrEqual(720);
     expect(state.clock).toBeLessThanOrEqual(DAY_LENGTH);
+    expect(state.flags).toContain("left-the-kantei");
   });
 
   it("closes the day at midnight for a player who never stops", () => {
@@ -849,5 +852,31 @@ describe("the whole day", () => {
     expect(restarted.highlights).toHaveLength(0);
     expect(restarted.place).toBe("bedroom");
     expect(restarted.mode.kind).toBe("wake");
+  });
+});
+
+describe("同じ人が、朝と夜で同じことを言わない", () => {
+  it("gives the wife a different conversation once the day is over", () => {
+    const tree = findTree("wife")!;
+
+    const morning = nodeOf(tree, "root", [])!;
+    const evening = nodeOf(tree, "root", ["left-the-kantei"])!;
+
+    expect(morning.prompt).not.toBe(evening.prompt);
+    expect(morning.choices.map((choice) => choice.id)).not.toEqual(
+      evening.choices.map((choice) => choice.id),
+    );
+  });
+
+  it("offers the evening topics only after the player has come home", () => {
+    const beforeGoing = { ...at(awake(), "living"), clock: 60 };
+    const tree = findTree("wife")!;
+    const node = nodeOf(tree, "root", beforeGoing.flags)!;
+
+    expect(choicesAt(beforeGoing, tree, node).map((c) => c.id)).not.toContain("evening-today");
+
+    const home = { ...at(awake(), "living"), clock: 900, flags: ["left-the-kantei"] };
+    const evening = nodeOf(tree, "root", home.flags)!;
+    expect(choicesAt(home, tree, evening).map((c) => c.id)).toContain("evening-today");
   });
 });

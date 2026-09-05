@@ -1,7 +1,5 @@
 import type { Action } from "../../types/action";
 
-/** 20:00に官邸を出る。ここにある行動は、その前だけのもの。 */
-const LEAVES = 840;
 
 /**
  * 官邸で午後を埋めるための行動（設計書14章）。予定と予定のあいだが
@@ -14,7 +12,6 @@ export const SIGN_PAPERS: Action = {
   emoji: "🖋️",
   places: ["office"],
   hint: "決裁箱が、また埋まっている",
-  until: LEAVES,
   perSegment: { fatigue: 2 },
   segments: [
     {
@@ -53,7 +50,6 @@ export const KANTEI_TEA: Action = {
   emoji: "🍵",
   places: ["office"],
   hint: "茶が出てくる。頼んでいないのに",
-  until: LEAVES,
   repeatable: true,
   perSegment: { fatigue: -3 },
   segments: [
@@ -75,7 +71,6 @@ export const CHECK_PRESS: Action = {
   emoji: "📋",
   places: ["secretariat"],
   hint: "秘書官室の机に、切り抜きが積んである",
-  until: LEAVES,
   perSegment: { fatigue: 1 },
   segments: [
     {
@@ -96,7 +91,6 @@ export const WALK_GROUNDS: Action = {
   emoji: "🌿",
   places: ["entrance"],
   hint: "玄関の脇から、庭に出られる",
-  until: LEAVES,
   perSegment: { fatigue: -4 },
   segments: [
     {

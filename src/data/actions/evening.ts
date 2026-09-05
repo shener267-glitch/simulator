@@ -2,7 +2,8 @@ import type { Action } from "../../types/action";
 import { ELDER_SON, WIFE, YOUNGER_SON } from "../characters";
 
 /** 20:00に宿舎へ戻ってから先。夜にしか出ない行動をここに集める。 */
-const EVENING = 840;
+/** 官邸を出られる時刻。早く帰れば、その分だけ夜が長い。 */
+const EVENING = 720;
 
 export const EAT_DINNER: Action = {
   id: "dinner",

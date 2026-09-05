@@ -9,6 +9,7 @@ import { DurationSheet } from "./DurationSheet";
 import { ConcernCard } from "./ConcernCard";
 import { PeopleHere } from "./PeopleHere";
 import { BedSheet } from "./BedSheet";
+import { LeaveSheet } from "./LeaveSheet";
 import { ConditionMeter } from "../shared/ConditionMeter";
 import { describeCondition, hungerGauge } from "../../engine/condition";
 import { useGameState } from "../../state/GameContext";
@@ -60,6 +61,7 @@ export function PlaceScreen() {
       {panel === "move" && <MoveSheet onClose={() => setPanel(null)} />}
       {panel === "item" && <ItemSheet onClose={() => setPanel(null)} />}
       {panel === "bed" && <BedSheet onClose={() => setPanel(null)} />}
+      {panel === "leave" && <LeaveSheet onClose={() => setPanel(null)} />}
     </div>
   );
 }

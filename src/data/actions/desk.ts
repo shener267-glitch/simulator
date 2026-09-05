@@ -11,8 +11,6 @@ import { SAWATARI } from "../characters";
  * ただの余りになる。
  */
 
-/** 官邸を出るまで。夜の宿舎に決裁箱は無い。 */
-const LEAVES = 840;
 
 export const SKIM_PAPERS: Action = {
   id: "skim",
@@ -73,7 +71,6 @@ export const CHECK_SCHEDULE: Action = {
   emoji: "📅",
   places: [...KANTEI, "study"],
   hint: "今日と、この先の一週間",
-  until: LEAVES,
   perSegment: { fatigue: 1 },
   segments: [
     {
@@ -253,7 +250,6 @@ export const ORDER_GROUNDWORK: Action = {
   emoji: "🤝",
   places: ["office", "secretariat"],
   hint: "決める前に、話を通しておく",
-  until: LEAVES,
   perSegment: { fatigue: 1 },
   segments: [
     {

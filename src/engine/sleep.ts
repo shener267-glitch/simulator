@@ -10,8 +10,8 @@ import type { GameState } from "../types/game";
  * という形でだけ返す — 明日はまだ無いので、いまは記録に残すところまで。
  */
 
-/** 予定が全部終わって宿舎に戻ったあと。それより前に寝る総理はいない。 */
-export const BEDTIME_EARLIEST: Minutes = 840; // 20:00
+/** 官邸を出られる時刻より前に寝る総理はいない。 */
+export const BEDTIME_EARLIEST: Minutes = 720; // 18:00
 
 /**
  * 寝られるか。夜の宿舎の寝室でだけ。予定が残っているうちは布団に入れない —
