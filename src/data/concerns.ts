@@ -1,87 +1,82 @@
 import type { Concern } from "../types/concern";
 import { DAY_LENGTH } from "../types/clock";
+import { WIFE } from "./characters";
 
 /**
- * 上から順に見て、当てはまったものを先頭から最大2件出す（`data/tendencies.ts`
- * と同じ書き味）。上にあるものほど、その日の本人にとって大きい。
+ * 上から順に見て、当てはまったものを先頭から最大2件出す。
  *
- * 一日の軸は経済対策に一本化してある（本セッションでの決定）。朝に資料を
- * 読まないまま11:00を迎えると、党幹部との会談で選べる手が減る。それが
- * 「無視できるが、無視した結果は出る」という形の全部で、点数はつかない。
+ * ここにあるのは感情と体だけ。「資料を読む」「官房長官に確認する」といった
+ * 仕事は📋やること（`data/duties.ts`）の側にある。分けたのは、この二つが
+ * 混ざると内心がToDoリストに見えてしまうから（本セッションでの決定）。
+ *
+ * 体の感覚は時計ではなく体調から出す。朝食を抜けば昼前に腹の話が出てくるし、
+ * 取っていれば出てこない。無視しても叱られないが、体調そのものは動く。
  */
 export const CONCERNS: Concern[] = [
   {
-    id: "papers-unread",
-    text: "昨夜届いた経済対策の資料に、まだ目を通していない。",
-    until: 300, // 党幹部との会談。過ぎたら、もう間に合わない
-    unlessFlags: ["skimmed-economic-papers", "read-economic-papers"],
+    id: "starving",
+    text: "腹が減って、他のことが頭に入ってこない。",
+    whenHungerOver: 78,
   },
   {
-    id: "papers-half",
-    text: "資料は途中までしか読んでいない。四ページ目の試算を見ていない。",
-    until: 300,
-    requiresFlags: ["skimmed-economic-papers"],
-    unlessFlags: ["read-economic-papers"],
+    id: "spent",
+    text: "頭の芯が重い。目の奥が、じんと痛む。",
+    whenFatigueOver: 82,
   },
   {
-    id: "objection",
-    text: "経済対策の財源に、党内から声が出ているらしい。誰が言っているのかは分からない。",
-    until: 300,
-    requiresFlags: ["knows-the-objection"],
-    unlessFlags: ["chased-the-objection", "asked-who-objects"],
+    id: "hungry",
+    text: "そろそろ何か腹に入れておきたい。",
+    whenHungerOver: 58,
+  },
+  {
+    id: "sleepy",
+    text: "少し眠い。昨日は日付が変わってからだった。",
+    whenFatigueOver: 62,
   },
   {
     id: "not-dressed",
-    text: "まだ着替えていない。八時前には車が来る。",
+    text: "まだ寝間着のままだ。",
     from: 30, // 06:30
     until: 115,
     unlessFlags: ["dressed"],
   },
   {
-    id: "no-breakfast",
-    text: "昨日の昼から、ろくに食べていない。",
-    from: 45, // 06:45
-    until: 115,
-    unlessFlags: ["ate-breakfast"],
-  },
-  {
-    id: "wife",
-    text: "咲希と、昨日からまだ一言も話していない。",
+    id: "wife-morning",
+    text: `${WIFE.name}と、昨日からまだ一言も話していない。`,
     from: 20,
     until: 115,
     unlessFlags: ["talked-to-wife"],
   },
   {
-    id: "party-ahead",
-    text: "十一時に党幹部と会う。経済対策の話になる。",
-    from: 180, // 09:00
-    until: 300,
-    requiresFlags: ["read-economic-papers"],
+    id: "unreal",
+    text: "自分が総理大臣だという実感が、まだない。",
+    until: 240, // 閣議を主宰するまで
+    unlessFlags: ["addressed-the-cabinet", "heard-the-ministers"],
   },
   {
-    id: "papers-still-there",
-    text: "読み切れなかった資料が、机の上に残っている。",
-    from: 840, // 帰宅してから
-    requiresFlags: ["skimmed-economic-papers"],
-    unlessFlags: ["read-economic-papers"],
+    id: "heavy",
+    text: "今日はなんとなく、気分が重い。",
+    from: 450, // 午後、一日の折り返しあたり
+    until: 720,
+    whenFatigueOver: 55,
+  },
+  {
+    id: "watched",
+    text: "誰かに見られている感じが、朝からずっと抜けない。",
+    from: 120,
+    until: 600,
+    requiresFlags: ["talked-to-press"],
   },
   {
     id: "family-tonight",
     text: "今日は家族と、ほとんど顔を合わせていない。",
     from: 840,
-    unlessFlags: ["sat-with-family", "talked-to-wife"],
+    unlessFlags: ["sat-with-family", "talked-to-wife-tonight"],
   },
   {
-    id: "tomorrow",
-    text: "明日も八時に迎えが来る。もう寝てもいい時間だ。",
-    from: 1020, // 23:00
-    // 出口は就寝そのもの。寝れば一日が終わり、寝なければ24:00でここも閉じる。
+    id: "quiet",
+    text: "静かだ。昨日の今ごろは、まだ人に囲まれていた。",
+    from: 900,
     until: DAY_LENGTH,
-  },
-  {
-    id: "speech",
-    text: "所信表明で何を言うか、まだ一行も決まっていない。",
-    from: 240, // 10:00
-    unlessFlags: ["drafted-the-speech"],
   },
 ];
