@@ -68,7 +68,7 @@ export const GAGGLE: Meeting = {
       minutes: 2,
       reply: [
         {
-          text: "「本日はこれから閣議です。またあらためて」\n\n頭を下げて、扉の内側へ戻った。背中に質問が二つ、三つ飛んだが、振り返らなかった。",
+          text: "「本日はこれから臨時閣議です。またあらためて」\n\n頭を下げて、扉の内側へ戻った。背中に質問が二つ、三つ飛んだが、振り返らなかった。",
         },
       ],
     },
@@ -167,7 +167,7 @@ export const MORNING_MEETING: Meeting = {
       reply: [
         {
           speaker: SAWATARI.shortName,
-          text: "「十時に閣議、十一時に党幹部、正午に昼食。午後は安保・情報、外務、内閣府と続きます」",
+          text: "「十時に臨時閣議、十一時に党幹部、正午に昼食。午後は安保・情報、外務、内閣府と続きます」",
         },
         {
           speaker: SAWATARI.shortName,
@@ -195,7 +195,7 @@ export const MORNING_MEETING: Meeting = {
   closing: [
     {
       speaker: SAWATARI.shortName,
-      text: "「以上です。閣議まで一時間ありますので、執務室でお過ごしください」",
+      text: "「以上です。臨時閣議まで一時間ありますので、執務室でお過ごしください」",
     },
     {
       speaker: SHINOZUKA.shortName,

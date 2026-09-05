@@ -4,7 +4,7 @@ import type { GameState } from "../../src/types/game";
 import { createInitialState } from "../../src/state/initialState";
 import { durationOptions, remainingToTarget } from "../../src/engine/actions";
 import { actionsAt } from "../../src/engine/places";
-import { offeredChoices } from "../../src/engine/meeting";
+import { meetingCeiling, offeredChoices } from "../../src/engine/meeting";
 import { canGoToBed } from "../../src/engine/sleep";
 import { DAY_LENGTH } from "../../src/types/clock";
 import { choicesAt, reachableFrom } from "../../src/engine/talk";
@@ -299,13 +299,13 @@ describe("a meeting, which fills its frame and no more", () => {
     });
   });
 
-  it("spends the frame on what the player chooses, and will not run past it", () => {
+  it("spends the frame on what the player chooses, and ends when the player stands up", () => {
     let state = gameReducer(upToTheGaggle(), { type: "MOVE_TO", place: "office" });
     state = gameReducer(state, { type: "MEETING_BEGIN" });
 
     expect(state.mode).toMatchObject({ kind: "meeting", stage: "choices" });
     // 落とし穴3の回帰: 会議中の予定は自分自身を天井にするので、区切りで即座に
-    // 切られたりはしない。10分の枠に、5分の話題はきちんと入る。
+    // 切られたりはしない。
     expect(offeredChoices(state).every((candidate) => candidate.fits)).toBe(true);
 
     state = gameReducer(state, { type: "MEETING_CHOOSE", choiceId: "gaggle-economy" });
@@ -313,18 +313,22 @@ describe("a meeting, which fills its frame and no more", () => {
     expect(state.flags).toContain("spoke-on-economy");
     expect(state.mode).toMatchObject({ kind: "meeting", stage: "reply", showing: "gaggle-economy" });
 
-    // 残り5分。5分の話題はまだ入るが、席を立てば枠の終わりまで飛ぶ。
+    // 席を立てば、そこで終わる。枠の残りを待つ必要はない（本セッションでの決定）。
     state = gameReducer(state, { type: "MEETING_BACK" });
     state = gameReducer(state, { type: "END_MEETING" });
     state = gameReducer(state, { type: "RESOLVE_APPOINTMENT" });
 
-    expect(state.clock).toBe(130);
+    expect(state.clock).toBe(125);
     expect(resolvedIds(state)).toContain("gaggle");
   });
 
-  it("never pushes the next appointment, however much was asked", () => {
+  it("lets a meeting run past its frame, but never into the next appointment", () => {
+    // 08:00のぶら下がりは枠10分。次は08:20のミーティングなので、
+    // 08:10までしか延ばせない（次の予定の10分前、設計上の余白）。
     let state = gameReducer(upToTheGaggle(), { type: "MOVE_TO", place: "office" });
     state = gameReducer(state, { type: "MEETING_BEGIN" });
+
+    expect(meetingCeiling(state)).toBe(130);
 
     for (let guard = 0; guard < 10; guard += 1) {
       if (state.mode.kind !== "meeting") break;
@@ -337,8 +341,30 @@ describe("a meeting, which fills its frame and no more", () => {
       state = gameReducer(state, { type: "MEETING_CHOOSE", choiceId: next.choice.id });
     }
 
-    // 枠は10分。何を選んでも、08:10を過ぎることはない。
     expect(state.clock).toBeLessThanOrEqual(130);
+  });
+
+  it("lets the last meeting of the day run as long as the player wants", () => {
+    // 予定が後ろに無ければ天井は一日の終わり。総理が切り上げると言うまで続く。
+    const alone = {
+      ...resolved(
+        withoutCall(at(awake(), "office")),
+        "departure",
+        "gaggle",
+        "morning-meeting",
+        "cabinet",
+        "party-leaders",
+        "lunch",
+        "security",
+        "foreign",
+        "return",
+      ),
+      clock: 599,
+    };
+    const sat = gameReducer(alone, { type: "MOVE_TO", place: "secretariat" });
+
+    expect(sat.mode).toMatchObject({ kind: "meeting", appointmentId: "cao" });
+    expect(meetingCeiling(sat)).toBe(DAY_LENGTH);
   });
 
   it("keeps the topics that do not fit on the table, greyed out", () => {

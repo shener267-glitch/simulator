@@ -38,11 +38,11 @@ export const APPOINTMENTS: Appointment[] = [
   },
   {
     id: "cabinet",
-    label: "閣議",
+    label: "臨時閣議",
     at: 240, // 10:00
     minutes: 40,
     resolved: false,
-    highlight: "初めての定例閣議を主宰した。",
+    highlight: "臨時閣議を主宰した。",
   },
   {
     id: "party-leaders",

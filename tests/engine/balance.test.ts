@@ -148,12 +148,14 @@ describe("一日を通したバランス", () => {
   });
 
   it("makes a day without food or rest cost something", () => {
-    // 官邸を出た時点で比べる。同じ時刻の同じ地点で、はっきり差が出ていること。
-    const relentless = playDay(RELENTLESS).atReturn!;
-    const steady = playDay(STEADY).atReturn!;
+    const relentless = playDay(RELENTLESS);
+    const steady = playDay(STEADY);
 
-    expect(relentless.hunger).toBeGreaterThan(steady.hunger);
-    expect(relentless.fatigue).toBeGreaterThan(steady.fatigue);
+    // 朝食を抜いた側は、昼までにはっきり腹が減る。昼食で両方とも戻るので、
+    // 差が出るのは戻る前 — いちばん減ったところで比べる。
+    expect(relentless.peakHunger).toBeGreaterThan(steady.peakHunger);
+    // 疲労は戻しきれない。官邸を出た時点で、同じ時刻の同じ地点で差が残る。
+    expect(relentless.atReturn!.fatigue).toBeGreaterThan(steady.atReturn!.fatigue);
   });
 
   it("will not let rest undo the hours themselves", () => {

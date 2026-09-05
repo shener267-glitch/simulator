@@ -1,7 +1,13 @@
 import { ScreenContainer } from "../shared/ScreenContainer";
 import { SheetRow } from "../shared/SheetRow";
 import { formatClock, formatDuration } from "../../engine/clock";
-import { currentMeeting, meetingBudget, offeredChoices, visibleBeats } from "../../engine/meeting";
+import {
+  currentMeeting,
+  isRunningOver,
+  meetingBudget,
+  offeredChoices,
+  visibleBeats,
+} from "../../engine/meeting";
 import type { MeetingBeat } from "../../types/meeting";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
 
@@ -42,6 +48,7 @@ export function MeetingScreen() {
   const mode = state.mode;
 
   const budget = meetingBudget(state);
+  const runningOver = isRunningOver(state);
   const showing = mode.showing
     ? meeting.choices.find((choice) => choice.id === mode.showing)
     : undefined;
@@ -51,10 +58,12 @@ export function MeetingScreen() {
       <div className="pt-[calc(1rem+env(safe-area-inset-top))]">
         <div className="flex items-baseline justify-between gap-3">
           <span className="figures font-figure text-[0.75rem] font-medium tracking-label text-brass">
-            {formatClock(appointment.at)} — {formatClock(appointment.at + appointment.minutes)}
+            {formatClock(appointment.at)} — {formatClock(state.clock)}
           </span>
-          <span className="figures text-[0.75rem] text-body-muted">
-            {budget > 0 ? `残り${formatDuration(budget)}` : "まもなく終わり"}
+          <span
+            className={`figures text-[0.75rem] ${runningOver ? "text-alert" : "text-body-muted"}`}
+          >
+            {runningOver ? "予定を超えている" : budget > 0 ? `残り${formatDuration(budget)}` : "まもなく終わり"}
           </span>
         </div>
         <h1 className="mt-2 text-[1.15rem] font-medium leading-snug text-body">{appointment.label}</h1>

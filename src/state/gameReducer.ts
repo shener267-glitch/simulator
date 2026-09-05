@@ -502,10 +502,15 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
       const appointment = state.appointments.find((candidate) => candidate.id === appointmentId);
       if (!appointment) return state;
 
-      // 予定は開始時刻からの固定枠として終わる。着席が一分遅れたぶんだけ
-      // 終わりまでずれると、八件並んだ一日では遅れが積み上がって時間割が
-      // 崩れる。08:20〜09:00の会議は、何分に座っても09:00に終わる。
-      const clock = Math.max(state.clock, Math.min(DAY_LENGTH, appointmentEnd(appointment)));
+      // 移動だけの予定は開始時刻からの固定枠として終わる。着席が一分遅れた
+      // ぶんだけ終わりまでずれると、八件並んだ一日では遅れが積み上がる。
+      //
+      // 会議は違う。プレイヤーが席を立つと決めた時刻で終わる（本セッションでの
+      // 決定）— 早く切り上げれば午後が伸び、延ばせばその分どこかが削れる。
+      const clock =
+        state.mode.kind === "meeting"
+          ? Math.min(DAY_LENGTH, state.clock)
+          : Math.max(state.clock, Math.min(DAY_LENGTH, appointmentEnd(appointment)));
       const spent = clock - state.clock;
       // 会議は席についたところから一行にまとめる。中で使った分は選択肢の側で
       // すでに時計を進めているので、ここで数え直さないと記録から抜け落ちる。
