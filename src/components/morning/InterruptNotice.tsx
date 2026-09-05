@@ -1,13 +1,7 @@
 import { Modal } from "../shared/Modal";
 import { formatClock, formatDuration } from "../../engine/clock";
-import type { InterruptChoice } from "../../types/game";
+import { optionOf, optionsOf } from "../../engine/interrupt";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
-
-const CHOICES: { id: InterruptChoice; label: string; note: string }[] = [
-  { id: "answer", label: "中断して確認する", note: "手を止めて出る" },
-  { id: "defer", label: "後回しにする", note: "あとで読む" },
-  { id: "ignore", label: "無視する", note: "出ない" },
-];
 
 /**
  * 行動の途中で届く連絡（設計書26章）。予定と違って時間は切らない。
@@ -33,8 +27,11 @@ export function InterruptNotice() {
           <span className="text-[0.78rem] tracking-wider text-body-muted">{interrupt.from}</span>
         </div>
 
-        {(mode.answered ? interrupt.body : interrupt.teaser).map((line) => (
-          <p key={line} className="text-[0.92rem] leading-[2] text-body">
+        {(mode.answered
+          ? (optionOf(interrupt, interrupt.answeredWith ?? "answer")?.body ?? interrupt.body)
+          : interrupt.teaser
+        ).map((line, index) => (
+          <p key={`${index}-${line}`} className="text-[0.92rem] leading-[2] text-body">
             {line}
           </p>
         ))}
@@ -55,7 +52,7 @@ export function InterruptNotice() {
           </button>
         ) : (
           <div className="flex flex-col gap-2.5">
-            {CHOICES.map((choice) => (
+            {optionsOf(interrupt).map((choice) => (
               <button
                 key={choice.id}
                 type="button"
@@ -67,7 +64,7 @@ export function InterruptNotice() {
                   <span className="mt-0.5 block text-[0.75rem] text-body-muted">{choice.note}</span>
                 </span>
                 <span className="figures shrink-0 text-[0.78rem] text-body-muted">
-                  {choice.id === "answer" ? formatDuration(interrupt.minutes) : "0分"}
+                  {choice.minutes > 0 ? formatDuration(choice.minutes) : "0分"}
                 </span>
               </button>
             ))}

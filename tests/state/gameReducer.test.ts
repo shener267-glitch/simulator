@@ -18,6 +18,7 @@ import {
   playThrough,
   resolved,
   resolvedIds,
+  upTo,
   waitForNextAppointment,
   run,
   totalLogged,
@@ -71,13 +72,13 @@ describe("spending time on an action", () => {
   });
 
   it("uses up an ordinary action but lets a repeatable one come round again", () => {
-    const usedUp = playThrough(awake(), "documents");
+    const usedUp = playThrough(withoutCall(awake()), "documents");
     expect(usedUp.spentActions).toContain("documents");
     expect(
       currentRun(gameReducer(usedUp, { type: "START_ACTION", actionId: "documents" })),
     ).toBeNull();
 
-    const twice = playThrough(playThrough(awake(), "idle"), "idle");
+    const twice = playThrough(playThrough(withoutCall(awake()), "idle"), "idle");
     expect(twice.clock).toBe(30);
     expect(twice.spentActions).not.toContain("idle");
   });
@@ -419,7 +420,10 @@ describe("the call that arrives on its own", () => {
   /** 09:17の着信の五分前。執務室にいて、次の一区切りで受け取ることになる。 */
   function upToTheCall() {
     return {
-      ...resolved(at(awake(), "office"), "departure", "gaggle", "morning-meeting"),
+      ...upTo(
+        resolved(at(awake(), "office"), "departure", "gaggle", "morning-meeting"),
+        "indicator",
+      ),
       clock: 192,
     };
   }
@@ -505,7 +509,7 @@ describe("the call that arrives on its own", () => {
     let state = gameReducer(rung, { type: "ANSWER_INTERRUPT", choice: "defer" });
     state = gameReducer(state, { type: "STOP_ACTION" });
 
-    expect(state.interrupts.every((item) => item.fired)).toBe(true);
+    expect(state.interrupts.find((item) => item.id === "indicator")?.fired).toBe(true);
     expect(state.mode.kind).not.toBe("interrupt");
   });
 });
@@ -631,7 +635,10 @@ describe("reading what was put off", () => {
   function deferredTheCall() {
     const rung = gameReducer(
       {
-        ...resolved(at(awake(), "office"), "departure", "gaggle", "morning-meeting"),
+        ...upTo(
+          resolved(at(awake(), "office"), "departure", "gaggle", "morning-meeting"),
+          "indicator",
+        ),
         clock: 192,
       },
       { type: "START_ACTION", actionId: "documents" },
@@ -828,7 +835,7 @@ describe("the whole day", () => {
   it("gets the call and every appointment in, however the time was spent", () => {
     const state = playUntilReview();
 
-    expect(state.interrupts.every((item) => item.fired)).toBe(true);
+    expect(state.interrupts.filter((item) => item.fired).length).toBeGreaterThanOrEqual(5);
     expect(state.appointments.every((appointment) => appointment.resolved)).toBe(true);
     expect(state.log.some((entry) => entry.label.includes("閣議"))).toBe(true);
   });

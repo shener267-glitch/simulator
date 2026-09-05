@@ -39,9 +39,31 @@ export function resolved(state: GameState, ...ids: string[]): GameState {
   };
 }
 
-/** 06:10の着信をすでに済ませたことにする。予定に切られる側だけを見たいとき用。 */
+/** 突発をすべて済ませたことにする。予定に切られる側だけを見たいとき用。 */
 export function withoutCall(state: GameState): GameState {
   return { ...state, interrupts: state.interrupts.map((item) => ({ ...item, fired: true })) };
+}
+
+/** 指定の突発だけを済ませたことにする。狙った一件だけを鳴らしたいとき用。 */
+export function alreadyRang(state: GameState, ...ids: string[]): GameState {
+  return {
+    ...state,
+    interrupts: state.interrupts.map((item) =>
+      ids.includes(item.id) ? { ...item, fired: true } : item,
+    ),
+  };
+}
+
+/** 指定の突発より前のものを、まとめて済ませたことにする。 */
+export function upTo(state: GameState, id: string): GameState {
+  const target = state.interrupts.find((item) => item.id === id);
+  if (!target) return state;
+  return {
+    ...state,
+    interrupts: state.interrupts.map((item) =>
+      item.at < target.at ? { ...item, fired: true } : item,
+    ),
+  };
 }
 
 /** Play one action from start to finish, or until something cuts it short. */

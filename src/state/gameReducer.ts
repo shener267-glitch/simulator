@@ -6,6 +6,7 @@ import type { PlaceId } from "../types/place";
 import { durationOptions, interruptionGuard, isSpent, resumeIndex } from "../engine/actions";
 import { isDayOver } from "../engine/clock";
 import { canGoToBed, carriedFatigue } from "../engine/sleep";
+import { optionOf } from "../engine/interrupt";
 import { RIDE_MINUTES, canLeaveKantei } from "../engine/leaving";
 import { applyElapsed, clampCondition } from "../engine/condition";
 import { travelMinutes } from "../engine/places";
@@ -380,61 +381,67 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
       if (!interrupt) return state;
 
       const choice = gameAction.choice;
+      const option = optionOf(interrupt, choice);
+      if (!option) return state;
+
       const marked: GameState = {
         ...state,
-        flags: addFlags(state.flags, interrupt.flags?.[choice]),
+        flags: addFlags(addFlags(state.flags, interrupt.flags?.[choice]), option.flags),
         interrupts: state.interrupts.map((candidate) =>
           candidate.id === interrupt.id ? { ...candidate, answeredWith: choice } : candidate,
         ),
       };
 
-      if (choice === "answer") {
-        // 手を止めて出る。走っていた行動はここで終わり、使った分が記録される。
-        // 走っていたものはここで終わる。使った分は取りこぼさずに記録する。
-        const closed =
-          mode.resume.kind === "action"
-            ? recordRun({ ...marked, mode: mode.resume }, mode.resume.run)
-            : mode.resume.kind === "talk"
-              ? recordTalk({ ...marked, mode: mode.resume })
-              : marked;
+      // 電話に残す手（後回し）。あとから時間を使って読める。
+      const withMessage: GameState = option.leavesMessage
+        ? {
+            ...marked,
+            phone: {
+              messages: [
+                ...marked.phone.messages,
+                {
+                  id: interrupt.id,
+                  from: interrupt.message.from,
+                  at: marked.clock,
+                  body: interrupt.message.body,
+                  minutes: interrupt.message.minutes,
+                  flags: interrupt.message.flags,
+                  read: false,
+                },
+              ],
+            },
+          }
+        : marked;
 
-        const room = interruptionGuard(closed) - closed.clock;
-        const spent = Math.max(0, Math.min(interrupt.minutes, room));
-
-        return {
-          ...closed,
-          clock: closed.clock + spent,
-          condition: applyElapsed(closed.condition, spent, closed.clock + spent),
-          log:
-            spent > 0
-              ? [
-                  ...closed.log,
-                  { label: `${interrupt.from}からの連絡`, minutes: spent, startedAt: closed.clock },
-                ]
-              : closed.log,
-          mode: { kind: "interrupt", interruptId: interrupt.id, answered: true, resume: { kind: "place" } },
-        };
+      // 時間を使わず、読むものも無い手は、そのまま元の画面に戻る。
+      if (option.minutes === 0 && !option.body) {
+        return { ...withMessage, mode: mode.resume };
       }
 
-      // 後回しにするか、無視するか。どちらも時間は使わず、元の画面に戻る。
-      // 違うのは、あとから読めるかどうかだけ。
-      const messages =
-        choice === "defer"
-          ? [
-              ...marked.phone.messages,
-              {
-                id: interrupt.id,
-                from: interrupt.message.from,
-                at: marked.clock,
-                body: interrupt.message.body,
-                minutes: interrupt.message.minutes,
-                flags: interrupt.message.flags,
-                read: false,
-              },
-            ]
-          : marked.phone.messages;
+      // 手を止める手。走っていた行動や会話はここで終わり、使った分が記録される。
+      const closed =
+        mode.resume.kind === "action"
+          ? recordRun({ ...withMessage, mode: mode.resume }, mode.resume.run)
+          : mode.resume.kind === "talk"
+            ? recordTalk({ ...withMessage, mode: mode.resume })
+            : withMessage;
 
-      return { ...marked, phone: { messages }, mode: mode.resume };
+      const room = interruptionGuard(closed) - closed.clock;
+      const spent = Math.max(0, Math.min(option.minutes, room));
+
+      return {
+        ...closed,
+        clock: closed.clock + spent,
+        condition: applyElapsed(closed.condition, spent, closed.clock + spent),
+        log:
+          spent > 0
+            ? [
+                ...closed.log,
+                { label: `${interrupt.from}からの連絡`, minutes: spent, startedAt: closed.clock },
+              ]
+            : closed.log,
+        mode: { kind: "interrupt", interruptId: interrupt.id, answered: true, resume: { kind: "place" } },
+      };
     }
 
     case "CLOSE_INTERRUPT": {

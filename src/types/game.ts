@@ -36,7 +36,28 @@ export interface Appointment {
   highlight?: string;
 }
 
-export type InterruptChoice = "answer" | "defer" | "ignore";
+/**
+ * 割り込みへの答え方（本セッションでの決定）。
+ *
+ * すべて聞かなければならない仕様にはしない。忙しい総理として合理的な
+ * 判断になる場合があるように、断る手が最初から並んでいる。断ったから
+ * といって、すぐに悪いことが起きるわけでもない。
+ */
+export type InterruptChoice = "answer" | "brief" | "defer" | "ignore" | "delegate";
+
+/** 割り込みの選択肢。件ごとに、出す手を選べる。 */
+export interface InterruptOption {
+  id: InterruptChoice;
+  label: string;
+  /** ラベルの下の一行。 */
+  note: string;
+  minutes: Minutes;
+  /** 選んだあとに読む段。省略すると、そのまま元の画面に戻る。 */
+  body?: string[];
+  flags?: string[];
+  /** 電話に残す。あとから時間を使って読める。 */
+  leavesMessage?: boolean;
+}
 
 /**
  * Something that arrives on its own — SOFT（設計書17章・26章）。予定と違って
@@ -53,8 +74,13 @@ export interface SoftInterrupt {
   teaser: string[];
   /** 「中断して確認する」で初めて読める本編。 */
   body: string[];
-  /** 出た場合に使う分。 */
+  /** 「中断して確認する」に使う分。option を書かないときの既定値。 */
   minutes: Minutes;
+  /**
+   * 出す手。省略すると 出る／後回し／無視 の三択になる。相手や場面に
+   * よって「三分だけ聞く」「秘書官に任せる」を足す。
+   */
+  options?: InterruptOption[];
   /** 後回しにしたときに電話へ残る中身。あとから、時間を使って読める。 */
   message: { from: string; body: string[]; minutes: Minutes; flags?: string[] };
   /**
@@ -66,7 +92,7 @@ export interface SoftInterrupt {
     to: Minutes;
     note: string;
   };
-  /** 選び方によって積む性格フラグ（設計書28章）。 */
+  /** 選び方によって積む性格フラグ（設計書28章）。options 側にも書ける。 */
   flags?: Partial<Record<InterruptChoice, string[]>>;
   highlight: string;
   fired: boolean;

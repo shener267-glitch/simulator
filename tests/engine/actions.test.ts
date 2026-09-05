@@ -12,7 +12,7 @@ import {
 import { ACTIONS, findAction } from "../../src/data/actions";
 import { gameReducer } from "../../src/state/gameReducer";
 import { DAY_LENGTH } from "../../src/types/clock";
-import { awake, resolved } from "../testUtils";
+import { awake, resolved, upTo } from "../testUtils";
 
 describe("interruption guard", () => {
   it("points at the next appointment, and at nothing softer", () => {
@@ -60,7 +60,10 @@ describe("interruption guard", () => {
 
   it("counts down to the party leaders once the call has moved them", () => {
     // 09:12。15分の資料を開くと着信の時刻を跨ぐ。切れ目で鳴り、そこで受ける。
-    const morning = resolved(awake(), "departure", "gaggle", "morning-meeting", "cabinet");
+    const morning = upTo(
+      resolved(awake(), "departure", "gaggle", "morning-meeting", "cabinet"),
+      "indicator",
+    );
     let state = gameReducer({ ...morning, clock: 192 }, { type: "START_ACTION", actionId: "documents" });
     state = gameReducer(state, { type: "ANSWER_INTERRUPT", choice: "defer" });
 
