@@ -6,6 +6,7 @@ import { formatClock, formatDuration } from "../../engine/clock";
 import { ITEMS, PHONE_APPS } from "../../data/items";
 import type { Action } from "../../types/action";
 import { daySchedule } from "../../engine/schedule";
+import { MORNING_DATE_LABEL, MORNING_DATE_STAMP } from "../../data/schedule";
 import { findAction } from "../../data/actions";
 import { reachableFrom } from "../../engine/talk";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
@@ -86,6 +87,12 @@ export function ItemSheet({ onClose }: { onClose: () => void }) {
   if (view === "calendar") {
     return (
       <Modal title="カレンダー" onClose={onClose}>
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <span className="figures font-figure text-[0.7rem] font-medium tracking-label text-brass">
+            {MORNING_DATE_STAMP}
+          </span>
+          <span className="text-[0.78rem] text-body-muted">{MORNING_DATE_LABEL}</span>
+        </div>
         <ul className="overflow-hidden rounded-xl border border-line bg-ink-panel">
           {daySchedule(state).map((entry) => (
             <li key={entry.id} className="flex gap-4 border-b border-line px-4 py-3 last:border-b-0">
