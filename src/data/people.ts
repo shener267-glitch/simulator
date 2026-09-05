@@ -64,7 +64,7 @@ export const PEOPLE: Person[] = [
     phone: true,
     presence: [
       { place: "living", until: 115, note: "台所に立っている" },
-      { place: "living", from: 840, note: "洗い物をしながらテレビをつけている" },
+      { place: "living", from: 720, note: "洗い物をしながらテレビをつけている" },
     ],
   },
   {

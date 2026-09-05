@@ -25,6 +25,8 @@ export interface DutyItem {
   until?: Minutes;
   /** これらが全て立っていて初めて出る。 */
   requiresFlags?: string[];
+  /** どれか一つでも立っていたら降ろす。もうできなくなった仕事を並べ続けない。 */
+  unlessFlags?: string[];
   /**
    * 期限。表示にだけ使う。過ぎても叱らない — 過ぎたことは、あとで
    * 手が足りないという形で分かる。

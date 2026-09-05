@@ -42,14 +42,16 @@ export const DUTIES: DutyItem[] = [
     until: 600,
     by: 420,
     doneFlags: ["talked-to-chief"],
+    unlessFlags: ["left-the-kantei"],
   },
   {
     id: "box",
     text: "決裁箱を空にする",
     from: "事務方",
     from_: 140,
-    until: 840,
     doneFlags: ["cleared-the-box"],
+    // 決裁箱は官邸にある。帰ったら、もう今日はできない。
+    unlessFlags: ["left-the-kantei"],
   },
   {
     id: "speech",
@@ -64,6 +66,7 @@ export const DUTIES: DutyItem[] = [
     from_: 560, // 会談のあと
     requiresFlags: ["knows-the-summit"],
     doneFlags: ["decided-the-summit"],
+    unlessFlags: ["left-the-kantei"],
   },
   {
     id: "package",
@@ -72,6 +75,7 @@ export const DUTIES: DutyItem[] = [
     from_: 600,
     requiresFlags: ["knows-the-deadline"],
     doneFlags: ["worked-the-package", "settled-the-package"],
+    unlessFlags: ["left-the-kantei"],
   },
   {
     id: "tomorrow",

@@ -14,6 +14,12 @@ import { WIFE } from "./characters";
  */
 export const CONCERNS: Concern[] = [
   {
+    id: "home-at-last",
+    text: "座ると、体が思っていたより重かった。",
+    requiresFlags: ["left-the-kantei"],
+    unlessFlags: ["bathed", "ate-dinner"],
+  },
+  {
     id: "starving",
     text: "腹が減って、他のことが頭に入ってこない。",
     whenHungerOver: 78,
@@ -70,7 +76,7 @@ export const CONCERNS: Concern[] = [
   {
     id: "family-tonight",
     text: "今日は家族と、ほとんど顔を合わせていない。",
-    from: 840,
+    requiresFlags: ["left-the-kantei"],
     unlessFlags: ["sat-with-family", "talked-to-wife-tonight"],
   },
   {

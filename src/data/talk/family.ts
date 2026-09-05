@@ -127,7 +127,7 @@ export const YOUNGER_SON_TREE: TalkTree = {
   label: `${YOUNGER_SON.name}と話す`,
   short: YOUNGER_SON.name,
   emoji: "🧑",
-  hint: "起きてきたところらしい",
+  hint: "こちらから連絡することは、めったにない",
   rootId: "root",
   nodes: [
     {

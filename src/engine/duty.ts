@@ -14,7 +14,8 @@ export function activeDuties(state: GameState): Duty[] {
     (duty) =>
       (duty.from_ === undefined || state.clock >= duty.from_) &&
       (duty.until === undefined || state.clock < duty.until) &&
-      (duty.requiresFlags ?? []).every((flag) => state.flags.includes(flag)),
+      (duty.requiresFlags ?? []).every((flag) => state.flags.includes(flag)) &&
+      !(duty.unlessFlags ?? []).some((flag) => state.flags.includes(flag)),
   ).map((duty) => ({
     ...duty,
     done: duty.doneFlags.some((flag) => state.flags.includes(flag)),

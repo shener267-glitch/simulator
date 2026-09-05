@@ -7,7 +7,7 @@ import { SHINOZUKA } from "../characters";
  */
 export const SHINOZUKA_TREE: TalkTree = {
   id: "shinozuka",
-  label: `${SHINOZUKA.shortName}に電話する`,
+  label: `${SHINOZUKA.shortName}と話す`,
   short: SHINOZUKA.shortName,
   emoji: "👩‍💼",
   hint: "事務担当。資料はいつも先に揃っている",

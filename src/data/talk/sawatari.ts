@@ -7,7 +7,7 @@ import { SAWATARI } from "../characters";
  */
 export const SAWATARI_TREE: TalkTree = {
   id: "sawatari",
-  label: `${SAWATARI.shortName}に電話する`,
+  label: `${SAWATARI.shortName}と話す`,
   short: SAWATARI.shortName,
   emoji: "👨‍💼",
   hint: "政務担当。八年、そばにいる",

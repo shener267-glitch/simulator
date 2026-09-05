@@ -9,6 +9,8 @@ export const EAT_BREAKFAST: Action = {
   emoji: "🍳",
   places: ["living"],
   hint: "食卓に用意されている",
+  /** 朝のもの。昼を過ぎたら、もう食卓には出ていない。 */
+  until: 300,
   perSegment: { hunger: -20, fatigue: -2 },
   segments: [
     {
