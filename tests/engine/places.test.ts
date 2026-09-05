@@ -73,3 +73,38 @@ describe("what a place offers", () => {
     }
   });
 });
+
+describe("一日ぶんの行動量", () => {
+  it("offers enough to fill the free time, not just a handful", () => {
+    // 自由時間は合わせて九時間近くある。五つの行動では埋まらない。
+    expect(ACTIONS.length).toBeGreaterThanOrEqual(30);
+  });
+
+  it("gives every action a unique id", () => {
+    const ids = ACTIONS.map((action) => action.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("keeps something short on the table wherever the player stands", () => {
+    // 「あと10分ある」を捨てずに済むように、どの部屋にも十分以内のものを置く。
+    for (const place of PLACE_ORDER) {
+      for (const clock of [60, 300, 700, 900]) {
+        const here = actionsAt(place, clock);
+        if (here.length === 0) continue;
+        const shortest = Math.min(...here.map((action) => action.segments[0].minutes));
+        expect(shortest, `${place} の ${clock}分 に短い行動がない`).toBeLessThanOrEqual(10);
+      }
+    }
+  });
+
+  it("puts the day's work where the work happens", () => {
+    // 決裁も情勢の確認も官邸の中。宿舎に決裁箱は無い。
+    const office = actionsAt("office", 300).map((action) => action.id);
+    expect(office).toContain("sign");
+    expect(office).toContain("economy");
+    expect(office).toContain("call-chief");
+
+    const bedroom = actionsAt("bedroom", 300).map((action) => action.id);
+    expect(bedroom).not.toContain("sign");
+  });
+});
