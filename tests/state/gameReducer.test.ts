@@ -7,7 +7,7 @@ import { actionsAt } from "../../src/engine/places";
 import { offeredChoices } from "../../src/engine/meeting";
 import { canGoToBed } from "../../src/engine/sleep";
 import { DAY_LENGTH } from "../../src/types/clock";
-import { choicesAt, talkableAt } from "../../src/engine/talk";
+import { choicesAt, reachableFrom } from "../../src/engine/talk";
 import { findTree } from "../../src/data/talk";
 import { findAction } from "../../src/data/actions";
 import {
@@ -485,13 +485,43 @@ describe("the call that arrives on its own", () => {
 
 describe("talking to people", () => {
   it("only offers whoever is actually within reach", () => {
-    // 秘書官は電話、妻はリビング、次男は07:00を過ぎてから。
-    expect(talkableAt(awake()).map((tree) => tree.id)).toEqual(["sawatari", "shinozuka"]);
-    expect(talkableAt(at(awake(), "living")).map((tree) => tree.id)).toContain("wife");
-    expect(talkableAt(at(awake(), "living")).map((tree) => tree.id)).not.toContain("son");
+    // 06:00の寝室。誰もいないので、掛かる相手だけが並ぶ。
+    const inBed = reachableFrom(awake());
+    expect(inBed.every((entry) => entry.reach === "phone")).toBe(true);
+    expect(inBed.map((entry) => entry.tree.id)).toContain("sawatari");
 
-    const later = { ...at(awake(), "living"), clock: 65 };
-    expect(talkableAt(later).map((tree) => tree.id)).toContain("son");
+    // リビングには妻がいる。次男は07:00を過ぎてから起きてくる。
+    const living = reachableFrom(at(awake(), "living"));
+    expect(living.find((entry) => entry.tree.id === "wife")?.reach).toBe("here");
+    expect(living.find((entry) => entry.tree.id === "son")?.reach).not.toBe("here");
+
+    const later = reachableFrom({ ...at(awake(), "living"), clock: 65 });
+    expect(later.find((entry) => entry.tree.id === "son")?.reach).toBe("here");
+  });
+
+  it("puts the secretaries in the secretaries' room, and lets the office call them in", () => {
+    // 秘書官室にいる相手は、電話ではなくその場で話せる（本セッションでの決定）。
+    const secretariat = reachableFrom({ ...at(awake(), "secretariat"), clock: 300 });
+    expect(secretariat.find((entry) => entry.tree.id === "sawatari")?.reach).toBe("here");
+    expect(secretariat.find((entry) => entry.tree.id === "shinozuka")?.reach).toBe("here");
+
+    // 執務室からは呼べる。来るまでの三分はこちらが払う。
+    const office = { ...at(awake(), "office"), clock: 300 };
+    expect(reachableFrom(office).find((entry) => entry.tree.id === "sawatari")?.reach).toBe("summon");
+
+    const called = gameReducer(office, { type: "OPEN_TALK", treeId: "sawatari" });
+    expect(called.clock).toBe(303);
+    expect(called.mode).toMatchObject({ kind: "talk", treeId: "sawatari", startedAt: 303 });
+  });
+
+  it("puts reporters in the entrance, all day", () => {
+    // 官邸3階エントランス。ぶら下がりの時間でなくても記者はいる。
+    const entrance = reachableFrom({ ...at(awake(), "entrance"), clock: 300 });
+    expect(entrance.find((entry) => entry.tree.id === "press")?.reach).toBe("here");
+
+    // 執務室に記者は入ってこないし、電話も掛からない。
+    const office = reachableFrom({ ...at(awake(), "office"), clock: 300 });
+    expect(office.map((entry) => entry.tree.id)).not.toContain("press");
   });
 
   it("writes one row for the whole conversation, not one per topic", () => {

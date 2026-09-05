@@ -11,7 +11,6 @@ export const SAWATARI_TREE: TalkTree = {
   short: SAWATARI.shortName,
   emoji: "👨‍💼",
   hint: "政務担当。八年、そばにいる",
-  channel: "phone",
   rootId: "root",
   nodes: [
     {

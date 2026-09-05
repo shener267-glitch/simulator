@@ -2,17 +2,51 @@ import type { GameState } from "../types/game";
 import type { TalkChoice, TalkNode, TalkTree } from "../types/talk";
 import { nodeOf } from "../types/talk";
 import { TALK_TREES } from "../data/talk";
+import { peopleAt, personById, whereIs } from "../data/people";
+import { SUMMON_MINUTES, type Reach } from "../types/person";
+
+export interface Reachable {
+  tree: TalkTree;
+  reach: Reach;
+  /** その部屋にいる人の一行。いない相手には付かない。 */
+  note?: string;
+}
 
 /**
- * いま話せる相手（設計書9章）。電話はどこからでも掛かるが、対面の相手は
- * その部屋にいなければ掴まらない。まだ起きていない相手も出さない。
+ * いま話せる相手と、どうやって届くか（設計書9章）。
+ *
+ * 同じ部屋にいれば、そのまま話しかけられる。執務室にいて相手が官邸の中に
+ * いるなら呼べるが、来るまでに三分かかる。それ以外は電話になる —
+ * 掛かる相手にだけ。
  */
-export function talkableAt(state: GameState): TalkTree[] {
-  return TALK_TREES.filter((tree) => {
-    if (tree.from !== undefined && state.clock < tree.from) return false;
-    if (tree.channel === "phone") return true;
-    return tree.places?.includes(state.place) ?? false;
+export function reachableFrom(state: GameState): Reachable[] {
+  const here = new Set(peopleAt(state).map((entry) => entry.person.id));
+
+  return TALK_TREES.flatMap((tree) => {
+    const person = personById(tree.id);
+    if (!person) return [];
+
+    if (here.has(person.id)) {
+      const note = peopleAt(state).find((entry) => entry.person.id === person.id)?.note;
+      return [{ tree, reach: "here" as Reach, note }];
+    }
+    // 呼べるのは執務室にいるときだけ。廊下から呼びつける総理はいない。
+    if (person.summonable && state.place === "office" && whereIs(person, state.clock) !== null) {
+      return [{ tree, reach: "summon" as Reach }];
+    }
+    if (person.phone) return [{ tree, reach: "phone" as Reach }];
+    return [];
   });
+}
+
+/** いま話せる相手だけ。届き方を問わないところで使う。 */
+export function talkableAt(state: GameState): TalkTree[] {
+  return reachableFrom(state).map((entry) => entry.tree);
+}
+
+/** その相手に届くまでに使う分。呼べば三分、それ以外はすぐ。 */
+export function reachMinutes(reach: Reach): number {
+  return reach === "summon" ? SUMMON_MINUTES : 0;
 }
 
 /** その相手ですでに使い切った話題。 */

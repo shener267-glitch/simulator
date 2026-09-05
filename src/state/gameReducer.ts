@@ -10,7 +10,7 @@ import { applyElapsed, clampCondition } from "../engine/condition";
 import { travelMinutes } from "../engine/places";
 import { dueAppointment, dueInterrupt, moveAppointment } from "../engine/schedule";
 import { findMeeting, offeredChoices } from "../engine/meeting";
-import { choicesAt, talkableAt } from "../engine/talk";
+import { choicesAt, reachMinutes, reachableFrom } from "../engine/talk";
 import { nodeOf, choiceOf } from "../types/talk";
 import { placeById } from "../data/places";
 import { findTree } from "../data/talk";
@@ -577,16 +577,23 @@ export function gameReducer(state: GameState, gameAction: GameAction): GameState
 
     case "OPEN_TALK": {
       if (state.mode.kind !== "place") return state;
-      const tree = talkableAt(state).find((candidate) => candidate.id === gameAction.treeId);
-      if (!tree) return state;
+      const entry = reachableFrom(state).find((candidate) => candidate.tree.id === gameAction.treeId);
+      if (!entry) return state;
+      const tree = entry.tree;
+
+      // 呼んだ相手は、来るまでの分をこちらが待つ。会話の記録はそこから始める。
+      const waited = reachMinutes(entry.reach);
+      const startedAt = state.clock + waited;
 
       return {
         ...state,
+        clock: startedAt,
+        condition: applyElapsed(state.condition, waited, startedAt),
         mode: {
           kind: "talk",
           treeId: tree.id,
           nodeId: tree.rootId,
-          startedAt: state.clock,
+          startedAt,
           minutesSpent: 0,
           run: null,
         },

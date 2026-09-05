@@ -7,7 +7,7 @@ import { ITEMS, PHONE_APPS } from "../../data/items";
 import type { Action } from "../../types/action";
 import { daySchedule } from "../../engine/schedule";
 import { findAction } from "../../data/actions";
-import { talkableAt } from "../../engine/talk";
+import { reachableFrom } from "../../engine/talk";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
 
 type View = "items" | "phone" | "calls" | "calendar" | "messages" | "mail" | "photos";
@@ -167,7 +167,7 @@ export function ItemSheet({ onClose }: { onClose: () => void }) {
   if (view === "calls") {
     // 「話す」からも掛けられるが、電話は電話にあるべきもの。同じ相手に
     // 同じ会話が開くだけで、別の導線を作っているわけではない。
-    const reachable = talkableAt(state).filter((tree) => tree.channel === "phone");
+    const reachable = reachableFrom(state).filter((entry) => entry.reach === "phone");
 
     return (
       <Modal title="電話" onClose={onClose}>
@@ -177,7 +177,7 @@ export function ItemSheet({ onClose }: { onClose: () => void }) {
           </p>
         ) : (
           <div className="flex flex-col gap-2.5">
-            {reachable.map((tree) => (
+            {reachable.map(({ tree }) => (
               <SheetRow
                 key={tree.id}
                 emoji={tree.emoji}

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { blockedBecause } from "../../src/engine/actions";
 import { findAction } from "../../src/data/actions";
 import { PHONE_APPS } from "../../src/data/items";
-import { talkableAt } from "../../src/engine/talk";
+import { reachableFrom } from "../../src/engine/talk";
 import { WAKE_BEATS } from "../../src/data/schedule";
 import { at, awake } from "../testUtils";
 
@@ -16,14 +16,18 @@ describe("the phone", () => {
     }
   });
 
-  it("reaches both secretaries through the phone app, wherever the player is", () => {
-    const byPhone = (place: Parameters<typeof at>[1]) =>
-      talkableAt(at(awake(), place))
-        .filter((tree) => tree.channel === "phone")
-        .map((tree) => tree.id);
+  it("reaches both secretaries through the phone app when they are not in the room", () => {
+    const byPhone = (place: Parameters<typeof at>[1], clock: number) =>
+      reachableFrom({ ...at(awake(), place), clock })
+        .filter((entry) => entry.reach === "phone")
+        .map((entry) => entry.tree.id);
 
-    expect(byPhone("bath")).toEqual(["sawatari", "shinozuka"]);
-    expect(byPhone("office")).toEqual(["sawatari", "shinozuka"]);
+    // 06:00の風呂。二人はまだ官邸に来ていないので、電話でしか掴まらない。
+    expect(byPhone("bath", 0)).toContain("sawatari");
+    expect(byPhone("bath", 0)).toContain("shinozuka");
+
+    // 10:00のエントランス。二人は秘書官室にいて、ここからは電話になる。
+    expect(byPhone("entrance", 240)).toContain("sawatari");
   });
 
   it("can always say why a news app will not open, instead of doing nothing", () => {

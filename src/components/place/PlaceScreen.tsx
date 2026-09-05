@@ -7,6 +7,7 @@ import { TalkSheet } from "./TalkSheet";
 import { ItemSheet } from "./ItemSheet";
 import { DurationSheet } from "./DurationSheet";
 import { ConcernCard } from "./ConcernCard";
+import { PeopleHere } from "./PeopleHere";
 import { BedSheet } from "./BedSheet";
 import { ConditionMeter } from "../shared/ConditionMeter";
 import { describeCondition, hungerGauge } from "../../engine/condition";
@@ -28,6 +29,8 @@ export function PlaceScreen() {
 
       <div className="flex flex-1 flex-col gap-4 pt-5">
         <ConcernCard />
+
+        <PeopleHere />
 
         <div className="rounded-2xl border border-line bg-ink-panel px-5 py-4">
           <p className="font-figure text-[0.6rem] font-medium tracking-label text-brass">CONDITION</p>

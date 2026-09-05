@@ -51,7 +51,7 @@ export const KANTEI_TEA: Action = {
   label: "一息つく",
   category: "rest",
   emoji: "🍵",
-  places: ["office", "secretariat"],
+  places: ["office"],
   hint: "茶が出てくる。頼んでいないのに",
   until: LEAVES,
   repeatable: true,

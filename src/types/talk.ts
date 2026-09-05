@@ -1,9 +1,4 @@
-import type { Minutes } from "./clock";
-import type { PlaceId } from "./place";
 import type { Segment } from "./action";
-
-/** 電話は場所を選ばない。対面は、その人がいる部屋でしか掴まらない。 */
-export type TalkChannel = "phone" | "in-person";
 
 export type TalkChoice =
   /** 「指示を出す」「相談する」など。枝を移るだけで、時間は使わない。 */
@@ -39,11 +34,11 @@ export interface TalkTree {
   short: string;
   emoji: string;
   hint: string;
-  channel: TalkChannel;
-  /** 対面のときだけ指定する。電話は省略で、どこからでも掛かる。 */
-  places?: PlaceId[];
-  /** この時刻より前は掴まらない。 */
-  from?: Minutes;
+  /**
+   * 誰がどこにいるかは `data/people.ts` が持つ。木の側に居場所を書くと
+   * 「秘書官室にいるのに電話で話す」ような食い違いが静かに生まれる。
+   * id は人物のidと一致していなければならない。
+   */
   rootId: string;
   nodes: TalkNode[];
 }

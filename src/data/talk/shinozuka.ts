@@ -11,7 +11,6 @@ export const SHINOZUKA_TREE: TalkTree = {
   short: SHINOZUKA.shortName,
   emoji: "👩‍💼",
   hint: "事務担当。資料はいつも先に揃っている",
-  channel: "phone",
   rootId: "root",
   nodes: [
     {

@@ -11,8 +11,6 @@ export const WIFE_TREE: TalkTree = {
   short: WIFE.name,
   emoji: "👩",
   hint: "台所に灯りがついている",
-  channel: "in-person",
-  places: ["living"],
   rootId: "root",
   nodes: [
     {
@@ -83,9 +81,6 @@ export const YOUNGER_SON_TREE: TalkTree = {
   short: YOUNGER_SON.name,
   emoji: "🧑",
   hint: "起きてきたところらしい",
-  channel: "in-person",
-  places: ["living"],
-  from: 60, // 07:00
   rootId: "root",
   nodes: [
     {
