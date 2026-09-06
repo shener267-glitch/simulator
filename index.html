@@ -6,16 +6,17 @@
     <meta name="theme-color" content="#0B0D12" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏛️</text></svg>" />
     <!--
-      Noto Sans JP carries the whole game; Inter is used only for the clock,
-      dates and Latin labels. Google serves the Japanese face in unicode-range
-      subsets, so a page pulls down only the glyph blocks it actually shows,
-      and the -apple-system fallback renders immediately either way.
+      v0.3から本文はDotGothic16（ドット字形の和文フォント、SIL OFL）。
+      指示書22章の「ドット絵調のUI」に沿わせた選択で、実在の官公庁システムの
+      主張ではない——ゲーム上の見た目の設定。読みにくくなりすぎないよう、
+      Noto Sans JPを次点に、-apple-systemを最終フォールバックに置く。
+      Google Fonts側で読めない環境でも、フォールバック連鎖でそのまま表示できる。
     -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500&family=Noto+Sans+JP:wght@400;500;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Inter:wght@200;300;400;500&family=Noto+Sans+JP:wght@400;500;700&display=swap"
     />
     <title>総理大臣人生シミュレーター</title>
   </head>

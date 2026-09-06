@@ -1,5 +1,4 @@
 import type { GameState } from "../types/game";
-import { isPlaceId } from "../data/places";
 import { SAVE_VERSION } from "./initialState";
 
 /** 版はここ一箇所から作る。定数とキー文字列に別々に埋めると必ずずれる。 */
@@ -14,8 +13,8 @@ export function saveGame(state: GameState): void {
 }
 
 /**
- * 版が違えば捨てる。移行は書かない — v0.2で状態の形が変わっており、古い
- * セーブを読めるように保つ価値より、読めてしまったときに壊れる危険が勝る。
+ * 版が違えば捨てる。移行は書かない — v0.3で状態の形が丸ごと変わっており、
+ * 古いセーブを読めるように保つ価値より、読めてしまったときに壊れる危険が勝る。
  */
 export function loadGame(): GameState | null {
   try {
@@ -23,10 +22,9 @@ export function loadGame(): GameState | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as GameState;
     if (parsed.saveVersion !== SAVE_VERSION) return null;
-    // 画面の種類が読めないセーブは、routing が判断できないので捨てる。
+    // 画面の種類・時計が読めないセーブは、routing が判断できないので捨てる。
     if (typeof parsed.mode?.kind !== "string") return null;
-    // 消えた部屋を持つセーブを通すと、あとで placeById が落ちる。
-    if (!isPlaceId(parsed.place)) return null;
+    if (typeof parsed.clock?.totalMinutes !== "number") return null;
     return parsed;
   } catch {
     return null;

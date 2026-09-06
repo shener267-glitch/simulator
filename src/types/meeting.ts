@@ -1,5 +1,5 @@
 import type { Minutes } from "./clock";
-import type { ConditionDelta } from "./action";
+import type { NationStatusDelta } from "./game";
 
 /**
  * 会議の中の一行。フラグで出し分けられる（設計書15章・28章）。
@@ -31,8 +31,11 @@ export interface MeetingChoice {
   unlessFlag?: string;
   flags?: string[];
   highlight?: string;
-  /** 昼食のように、選ぶこと自体が体調を動かすものがある。 */
-  condition?: ConditionDelta;
+  /**
+   * この場で決めたことが、しばらく経ってから国家ステータスに小さく効く
+   * （設計書19章・20章）。その場で数字が動くわけではない。
+   */
+  delayedEffect?: { afterMinutes: Minutes; delta: NationStatusDelta; note: string };
 }
 
 export interface Meeting {

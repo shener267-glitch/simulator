@@ -16,9 +16,10 @@ html {
 body {
   background-color: #0b0d12;
   color: #f2f3f5;
-  font-family: "Noto Sans JP", -apple-system, BlinkMacSystemFont, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-family: "DotGothic16", "Noto Sans JP", -apple-system, BlinkMacSystemFont, sans-serif;
+  /* ドット字形は輪郭をにじませない方がそれらしく見える。 */
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
   /* Kill the rubber-band bounce so the sticky header stays put. */
   overscroll-behavior-y: none;
 }

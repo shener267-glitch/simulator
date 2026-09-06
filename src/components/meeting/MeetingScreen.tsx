@@ -1,13 +1,7 @@
 import { ScreenContainer } from "../shared/ScreenContainer";
 import { SheetRow } from "../shared/SheetRow";
-import { formatClock, formatDuration } from "../../engine/clock";
-import {
-  currentMeeting,
-  isRunningOver,
-  meetingBudget,
-  offeredChoices,
-  visibleBeats,
-} from "../../engine/meeting";
+import { formatDuration, formatTime } from "../../engine/clock";
+import { currentMeeting, meetingBudget, offeredChoices, visibleBeats } from "../../engine/meeting";
 import type { MeetingBeat } from "../../types/meeting";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
 
@@ -34,8 +28,8 @@ function Beats({ beats }: { beats: MeetingBeat[] }) {
 }
 
 /**
- * 会議（設計書15章）。文章を読んで終わりにはしない。枠の中で小さな判断を
- * させる — 40分の枠に10分の話題は四つしか入らないので、何を聞かずに終える
+ * 予定を場面にしたもの（設計書15章・28章）。文章を読んで終わりにはしない。
+ * 枠の中で小さな判断をさせる——枠の全部は聞けないので、何を聞かずに終える
  * かが、その会議の中身になる。
  */
 export function MeetingScreen() {
@@ -48,22 +42,18 @@ export function MeetingScreen() {
   const mode = state.mode;
 
   const budget = meetingBudget(state);
-  const runningOver = isRunningOver(state);
-  const showing = mode.showing
-    ? meeting.choices.find((choice) => choice.id === mode.showing)
-    : undefined;
+  const showing = mode.showing ? meeting.choices.find((choice) => choice.id === mode.showing) : undefined;
 
   return (
     <ScreenContainer width="narrow">
       <div className="pt-[calc(1rem+env(safe-area-inset-top))]">
         <div className="flex items-baseline justify-between gap-3">
           <span className="figures font-figure text-[0.75rem] font-medium tracking-label text-brass">
-            {formatClock(appointment.at)} — {formatClock(state.clock)}
+            {formatTime(appointment.at)} —{" "}
+            {budget === Number.MAX_SAFE_INTEGER ? "" : formatTime(state.clock.totalMinutes)}
           </span>
-          <span
-            className={`figures text-[0.75rem] ${runningOver ? "text-alert" : "text-body-muted"}`}
-          >
-            {runningOver ? "予定を超えている" : budget > 0 ? `残り${formatDuration(budget)}` : "まもなく終わり"}
+          <span className="figures text-[0.75rem] text-body-muted">
+            {budget === Number.MAX_SAFE_INTEGER ? "" : `残り${formatDuration(budget)}`}
           </span>
         </div>
         <h1 className="mt-2 text-[1.15rem] font-medium leading-snug text-body">{appointment.label}</h1>
@@ -107,7 +97,7 @@ export function MeetingScreen() {
                 key={choice.id}
                 emoji="·"
                 label={choice.label}
-                note={fits ? choice.note : "この会議では時間が足りない"}
+                note={fits ? choice.note : "この場では時間が足りない"}
                 meta={formatDuration(choice.minutes)}
                 disabled={!fits}
                 onClick={() => dispatch({ type: "MEETING_CHOOSE", choiceId: choice.id })}
@@ -120,7 +110,7 @@ export function MeetingScreen() {
             onClick={() => dispatch({ type: "END_MEETING" })}
             className="min-h-[52px] w-full rounded-xl border border-line-strong px-4 text-[0.9rem] font-medium text-body-muted transition-colors duration-200 hover:border-brass/40 hover:text-body active:bg-white/5"
           >
-            会議を終える
+            切り上げる
           </button>
         </>
       )}

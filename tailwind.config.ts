@@ -35,9 +35,18 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['"Noto Sans JP"', "-apple-system", "BlinkMacSystemFont", "sans-serif"],
+        /** v0.3: ドット字形の和文フォントを本文に（指示書22章）。読めない環境向けのフォールバックは維持する。 */
+        sans: ['"DotGothic16"', '"Noto Sans JP"', "-apple-system", "BlinkMacSystemFont", "sans-serif"],
         /** Clock, dates and Latin labels only — never Japanese body text. */
-        figure: ['"Inter"', "-apple-system", "BlinkMacSystemFont", "sans-serif"],
+        figure: ['"DotGothic16"', '"Inter"', "-apple-system", "BlinkMacSystemFont", "sans-serif"],
+      },
+      borderRadius: {
+        /** ドット絵調の角——丸めをほぼ落として、ブロックの積み重なりに見せる。 */
+        DEFAULT: "2px",
+        lg: "2px",
+        xl: "3px",
+        "2xl": "4px",
+        "3xl": "4px",
       },
       letterSpacing: {
         label: "0.18em",

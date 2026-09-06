@@ -1,25 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { formatClock, formatDuration, isDayOver } from "../../src/engine/clock";
-import { DAY_LENGTH } from "../../src/types/clock";
+import { formatDate, formatDateTime, formatDuration, formatTime, minutesIntoDay, minutesPerTick } from "../../src/engine/clock";
+import { DAY_START_MINUTES, MINUTES_IN_DAY } from "../../src/types/clock";
 
 describe("the clock", () => {
-  it("reads offsets from 06:00 as wall-clock times", () => {
-    expect(formatClock(0)).toBe("06:00");
-    expect(formatClock(70)).toBe("07:10");
-    expect(formatClock(115)).toBe("07:55");
-    expect(formatClock(360)).toBe("12:00");
-    expect(formatClock(840)).toBe("20:00");
+  it("reads the start of the game as the morning of 2024-10-01", () => {
+    expect(formatDate(0)).toBe("10月1日(火)");
+    expect(formatTime(DAY_START_MINUTES)).toBe("07:00");
   });
 
-  it("calls the end of the day 24:00 rather than starting over at zero", () => {
-    expect(formatClock(DAY_LENGTH)).toBe("24:00");
+  it("rolls over into the next calendar day without breaking", () => {
+    expect(formatDate(MINUTES_IN_DAY)).toBe("10月2日(水)");
+    expect(formatTime(MINUTES_IN_DAY)).toBe("00:00");
   });
 
-  it("wraps anything outside the day instead of printing 25:00", () => {
-    // 丸めがないと、範囲外はエラーも出さずに "25:00" や "-1:-10" になる。
-    expect(formatClock(DAY_LENGTH + 60)).toBe("01:00");
-    expect(formatClock(-60)).toBe("05:00");
-    expect(formatClock(-360)).toBe("00:00");
+  it("combines date and time", () => {
+    expect(formatDateTime(DAY_START_MINUTES + 43)).toBe("10月1日(火) 07:43");
   });
 
   it("says how long something took", () => {
@@ -28,8 +23,13 @@ describe("the clock", () => {
     expect(formatDuration(95)).toBe("1時間35分");
   });
 
-  it("ends the day at 24:00 and not a minute before", () => {
-    expect(isDayOver(DAY_LENGTH - 1)).toBe(false);
-    expect(isDayOver(DAY_LENGTH)).toBe(true);
+  it("takes the minute-of-day out of an absolute total", () => {
+    expect(minutesIntoDay(DAY_START_MINUTES)).toBe(DAY_START_MINUTES);
+    expect(minutesIntoDay(MINUTES_IN_DAY + 30)).toBe(30);
+  });
+
+  it("advances one game-minute per speed unit on each tick", () => {
+    expect(minutesPerTick(1)).toBe(1);
+    expect(minutesPerTick(10)).toBe(10);
   });
 });

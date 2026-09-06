@@ -1,162 +1,158 @@
-import type { Minutes } from "./clock";
-import type { PlaceId } from "./place";
-import type { Mode } from "./mode";
+import type { Clock, Minutes } from "./clock";
+import type { MeetingStage } from "./meeting";
 
 /**
- * Tracked internally but never rendered as a number — the UI shows the prose
- * from engine/condition.ts and a five-cell meter, and neither ever prints a
- * digit（設計書24章・30章）.
+ * 国家ステータス（設計書24章）。数字は出すが、数字だけで結果を語らない
+ * （設計書20章）——ニュースや報告書の文章が主で、ここは背景の指標。
+ *
+ * 開始値は2024年10月1日時点の実際の値を参考にした概算
+ * ——名目GDP・政府債務・人口は【参考】、内閣支持率などゲーム固有の指標は
+ * 【ゲーム上の設定】（史実の支持率調査値をそのまま使うと、その日の紙面と
+ * 矛盾しかねないため、切りのよい概算に振ってある）。
  */
-export interface Condition {
-  /** 0 = 万全, 100 = 限界. */
-  fatigue: number;
-  /** 0 = 満腹, 100 = 空腹. */
-  hunger: number;
+export interface NationStatus {
+  /** 内閣支持率。0〜100。 */
+  approval: number;
+  /** 名目GDP、兆円。 */
+  gdpTrillionYen: number;
+  /** 実質成長率、%。 */
+  growthRate: number;
+  /** 消費者物価上昇率、%。 */
+  cpi: number;
+  /** 完全失業率、%。 */
+  unemployment: number;
+  /** 税収、兆円（年間ベース）。 */
+  taxRevenueTrillionYen: number;
+  /** 歳出、兆円（年間ベース）。 */
+  expenditureTrillionYen: number;
+  /** 政府債務残高、兆円。 */
+  govDebtTrillionYen: number;
+  /** 総人口、万人。 */
+  populationTenThousand: number;
+  /** 周辺の安全保障情勢。数値化しない三段階。 */
+  regionalTension: "平常" | "やや高い" | "高い";
+}
+
+export type NationStatusDelta = Partial<NationStatus>;
+
+/**
+ * 政策や危機の効果は、その場では数字に出ない（設計書19章）。しばらく
+ * 経ってから静かに反映される、という体裁のための遅延キュー。
+ */
+export interface PendingEffect {
+  id: string;
+  at: Minutes;
+  delta: NationStatusDelta;
+  /** 反映されたときにフィードへ一行出す。 */
+  note?: string;
 }
 
 /**
- * A fixed point in the morning the player does not control — HARD. Crossing
- * one cuts a segment short and charges only the minutes that were really left.
+ * 政治日程（設計書17章の「予定」）。国会審議・閣議・会談など、事前に
+ * 分かっている枠。総理が動かせるものではない——現実の制度上の日程として
+ * 降りてくる。
  */
 export interface Appointment {
   id: string;
   label: string;
-  /** Offset from 05:00. Events may pull this earlier. */
+  /** ゲーム開始からの絶対分。 */
   at: Minutes;
+  /** 名目上の枠の長さ。会議はこれより延ばせるし、早く切り上げてもよい。 */
   minutes: Minutes;
   resolved: boolean;
-  /** Where attending it leaves the player — 07:30の官邸入りがこれ。 */
-  movesTo?: PlaceId;
-  /**
-   * 予定表に載っているか。false のものは visibleFreeMinutes から隠れ、
-   * 不意打ちとして届く。省略時は true — 黙っていればプレイヤーは知っている。
-   */
-  announced?: boolean;
-  /** Recorded in the morning's highlights once attended. */
   highlight?: string;
 }
 
 /**
- * 割り込みへの答え方（本セッションでの決定）。
- *
- * すべて聞かなければならない仕様にはしない。忙しい総理として合理的な
- * 判断になる場合があるように、断る手が最初から並んでいる。断ったから
- * といって、すぐに悪いことが起きるわけでもない。
+ * 政府機関が作成した報告書（設計書10〜11章）。確度は「高/中/低」までで、
+ * 内部の数値としても持たない——確度そのものが情報という体裁にするため。
  */
-export type InterruptChoice = "answer" | "brief" | "defer" | "ignore" | "delegate";
-
-/** 割り込みの選択肢。件ごとに、出す手を選べる。 */
-export interface InterruptOption {
-  id: InterruptChoice;
-  label: string;
-  /** ラベルの下の一行。 */
-  note: string;
-  minutes: Minutes;
-  /** 選んだあとに読む段。省略すると、そのまま元の画面に戻る。 */
-  body?: string[];
-  flags?: string[];
-  /** 電話に残す。あとから時間を使って読める。 */
-  leavesMessage?: boolean;
-}
-
-/**
- * Something that arrives on its own — SOFT（設計書17章・26章）。予定と違って
- * セグメントを途中で切らない。切れ目で鳴り、出るか、後回しにするか、無視する
- * かをプレイヤーが選ぶ。
- */
-export interface SoftInterrupt {
+export interface Report {
   id: string;
-  at: Minutes;
+  from: string;
   title: string;
-  /** Who got in touch. */
-  from: string;
-  /** 中身を明かさない予告。三択の上に出す。 */
-  teaser: string[];
-  /** 「中断して確認する」で初めて読める本編。 */
-  body: string[];
-  /** 「中断して確認する」に使う分。option を書かないときの既定値。 */
-  minutes: Minutes;
-  /**
-   * 出す手。省略すると 出る／後回し／無視 の三択になる。相手や場面に
-   * よって「三分だけ聞く」「秘書官に任せる」を足す。
-   */
-  options?: InterruptOption[];
-  /** 後回しにしたときに電話へ残る中身。あとから、時間を使って読める。 */
-  message: { from: string; body: string[]; minutes: Minutes; flags?: string[] };
-  /**
-   * どう答えても起きる予定変更。世界の側の動きであって、プレイヤーの
-   * 選択で止まるものではない。
-   */
-  movesAppointment?: {
-    appointmentId: string;
-    to: Minutes;
-    note: string;
-  };
-  /** 選び方によって積む性格フラグ（設計書28章）。options 側にも書ける。 */
-  flags?: Partial<Record<InterruptChoice, string[]>>;
-  highlight: string;
-  fired: boolean;
-  answeredWith: InterruptChoice | null;
+  at: Minutes;
+  confidence: "高" | "中" | "低";
+  summary: string;
+  findings: string;
+  analysis: string;
+  outlook: string;
+  read: boolean;
+  flags?: string[];
+  /** 緊急案件。届いた瞬間にゲームを自動停止して見せる。 */
+  urgent?: boolean;
+}
+
+/** 政策決定の選択肢（設計書29章）。正解を用意しない——長所と短所だけ書く。 */
+export interface PolicyOption {
+  id: string;
+  label: string;
+  summary: string;
+  flags?: string[];
+  /** しばらく経ってから効いてくる、小さな変化。 */
+  delayedEffect?: { afterMinutes: Minutes; delta: NationStatusDelta; note: string };
+}
+
+export interface PolicyDecision {
+  id: string;
+  title: string;
+  prompt: string;
+  from: Minutes;
+  requiresFlags?: string[];
+  options: PolicyOption[];
+  /** 決めた選択肢のid。決めるまではundefined。 */
+  decided?: string;
+}
+
+/** 発火した危機イベント一件。テンプレートはdata/crises/catalogue.tsを参照。 */
+export interface FiredCrisis {
+  id: string;
+  templateId: string;
+  firedAt: Minutes;
+  acknowledged: boolean;
+}
+
+/** 画面に流す最新情報（設計書23章「📰最新情報」）。 */
+export interface FeedEntry {
+  id: string;
+  at: Minutes;
+  icon: string;
+  text: string;
+  kind: "news" | "report" | "urgent" | "policy" | "appointment" | "crisis";
 }
 
 /**
- * 電話に残っているもの。後回しにした連絡はここに落ちる。読むにも時間は
- * かかる — 後回しは時間を先送りする手であって、ただにする手ではない。
+ * いまどの画面か。会議と危機イベントだけが全画面を占めて時計を止める。
+ * 報告書・政策・省庁・国家ステータスは、時計が動いたまま覗ける窓
+ * （設計書17章の「予定」と「現実」の分離とは別に、情報を見ること自体は
+ * 時間を消費しない、という整理）。
  */
-export interface PhoneMessage {
-  id: string;
-  from: string;
-  at: Minutes;
-  body: string[];
-  minutes: Minutes;
-  read: boolean;
-  /** 読んで初めて知ることになる（設計書27章）。 */
-  flags?: string[];
-}
-
-/** What the player did and how long it took — the morning review reads this. */
-export interface LogEntry {
-  label: string;
-  minutes: Minutes;
-  startedAt: Minutes;
-  /** 移動の一分。続けて歩いた分は一行にまとめる。 */
-  move?: boolean;
-}
-
-export type Phase = "day" | "review";
+export type Mode =
+  | { kind: "main" }
+  | {
+      kind: "meeting";
+      appointmentId: string;
+      startedAt: Minutes;
+      stage: MeetingStage;
+      showing: string | null;
+      taken: string[];
+    }
+  | { kind: "event"; crisisId: string };
 
 export interface GameState {
   saveVersion: number;
-  clock: Minutes;
-  phase: Phase;
-  player: {
-    familyName: string;
-    givenName: string;
-  };
-  /** いまいる場所。画面（mode）とは独立 — 風呂にいるまま電話は見られる。 */
-  place: PlaceId;
-  condition: Condition;
-  /** HARD。跨ぐセグメントを切る。interruptionGuard が見るのはこれだけ。 */
-  appointments: Appointment[];
-  /** SOFT。ガードには入らず、セグメントの切れ目で鳴る。 */
-  interrupts: SoftInterrupt[];
-  /** いまどの画面にいるか。 */
+  clock: Clock;
   mode: Mode;
-  phone: { messages: PhoneMessage[] };
-  log: LogEntry[];
-  /** Notable moments, in the order they happened. */
-  highlights: string[];
-  /** 性格フラグ（設計書28章）。v0.2では貯めるだけで、誰の反応にも使わない。 */
-  flags: string[];
-  /** Actions whose segments have all been used up. */
-  spentActions: string[];
-  /** How far into each action the player has read, so returning to it resumes. */
-  actionProgress: Record<string, number>;
-  /** 相手ごとに、もう聞いてしまった話題。会話を抜けても朝の終わりまで残る。 */
-  talkProgress: Record<string, string[]>;
+  appointments: Appointment[];
+  reports: Report[];
+  policies: PolicyDecision[];
+  crises: FiredCrisis[];
+  pendingEffects: PendingEffect[];
+  feed: FeedEntry[];
+  nation: NationStatus;
   /**
-   * どう一日を閉じたか。自分で寝たのか、24:00に閉じられたのか、そのとき
-   * 何を翌朝へ持ち越すのか。翌日はまだ作らないが、引き継げる形にしておく。
+   * 知られたこと・決めたことの汎用フラグ（設計書27章の情報の連鎖に相当）。
+   * 報告書を読む・政策を決める・会議で選ぶ、のいずれからも立つ。
    */
-  sleep: { at: Minutes; forced: boolean; carriedFatigue: number } | null;
+  flags: string[];
 }
