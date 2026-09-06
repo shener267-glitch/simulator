@@ -10,7 +10,9 @@ export type FocusEffect =
   | { type: "modify_party_popularity"; partyId: string; amount: number }
   | { type: "add_national_modifier"; id: string; label: string }
   | { type: "trigger_event"; eventId: string }
-  | { type: "unlock_focus"; focusId: string };
+  | { type: "unlock_focus"; focusId: string }
+  /** 研究速度への加算ボーナス(%)。指示書19章、国家方針と研究の接続。 */
+  | { type: "modify_research_speed"; amount: number };
 
 export interface FocusTemplate {
   id: string;

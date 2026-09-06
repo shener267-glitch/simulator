@@ -206,3 +206,160 @@ describe("map inspection and category menu", () => {
     expect(next).toBe(state);
   });
 });
+
+describe("budget and economy policy", () => {
+  it("sets a budget category directly", () => {
+    const state = playing();
+    const next = gameReducer(state, { type: "SET_BUDGET", category: "defense", amount: 10 });
+    expect(next.economy.budget.defense).toBe(10);
+  });
+
+  it("never lets a budget category go negative", () => {
+    const state = playing();
+    const next = gameReducer(state, { type: "SET_BUDGET", category: "defense", amount: -5 });
+    expect(next.economy.budget.defense).toBe(0);
+  });
+
+  it("decides a policy once affordable, deducting its political power cost and scheduling its stages", () => {
+    let state = playing();
+    state = {
+      ...state,
+      politics: { ...state.politics, stats: { ...state.politics.stats, politicalPower: 100 } },
+    };
+    const next = gameReducer(state, { type: "DECIDE_ECONOMY_POLICY", policyId: "public-investment" });
+    expect(next.politics.stats.politicalPower).toBe(85); // cost 15
+    expect(next.economy.decidedPolicyIds).toContain("public-investment");
+    expect(next.economy.scheduledEffects.length).toBeGreaterThan(0);
+  });
+
+  it("refuses to decide a policy that cannot be afforded", () => {
+    const state = playing();
+    const next = gameReducer(state, { type: "DECIDE_ECONOMY_POLICY", policyId: "public-investment" });
+    expect(next).toBe(state);
+  });
+
+  it("refuses to decide the same policy twice", () => {
+    let state = playing();
+    state = {
+      ...state,
+      politics: { ...state.politics, stats: { ...state.politics.stats, politicalPower: 100 } },
+    };
+    const decided = gameReducer(state, { type: "DECIDE_ECONOMY_POLICY", policyId: "public-investment" });
+    const again = gameReducer(decided, { type: "DECIDE_ECONOMY_POLICY", policyId: "public-investment" });
+    expect(again).toBe(decided);
+  });
+});
+
+describe("economy over time", () => {
+  it("applies a scheduled policy stage once its minute arrives", () => {
+    let state = playing();
+    state = {
+      ...state,
+      politics: { ...state.politics, stats: { ...state.politics.stats, politicalPower: 100 } },
+    };
+    state = gameReducer(state, { type: "DECIDE_ECONOMY_POLICY", policyId: "public-investment" }); // 即時段階あり
+    const budgetBefore = state.economy.budget.publicWorks;
+    state = gameReducer(state, { type: "SET_SPEED", speed: 1 });
+    const next = gameReducer(state, { type: "TICK" });
+    expect(next.economy.budget.publicWorks).toBe(budgetBefore + 2);
+    expect(next.economy.scheduledEffects.length).toBe(state.economy.scheduledEffects.length - 1);
+  });
+
+  it("grows GDP and moves debt with the fiscal balance as time passes", () => {
+    let state = playing();
+    state = gameReducer(state, { type: "SET_SPEED", speed: 8 });
+    const before = state.economy.stats;
+    const next = gameReducer(state, { type: "TICK" });
+    expect(next.economy.stats.gdpTrillionYen).toBeGreaterThan(before.gdpTrillionYen);
+    expect(next.economy.stats.govDebtTrillionYen).toBeGreaterThan(before.govDebtTrillionYen); // 財政赤字なので増える
+  });
+
+  it("nudges government support from strong growth over time (指示書9章)", () => {
+    let state = playing();
+    state = {
+      ...state,
+      economy: { ...state.economy, stats: { ...state.economy.stats, gdpGrowthRate: 3, unemploymentRate: 2, inflationRate: 2 } },
+    };
+    state = gameReducer(state, { type: "SET_SPEED", speed: 8 });
+    const before = state.politics.stats.governmentSupport;
+    const next = gameReducer(state, { type: "TICK" });
+    expect(next.politics.stats.governmentSupport).toBeGreaterThan(before);
+  });
+});
+
+describe("research", () => {
+  it("starts a tech in a free slot", () => {
+    const state = playing();
+    const next = gameReducer(state, { type: "START_RESEARCH", techId: "sugaku" });
+    expect(next.research.active).toEqual([{ techId: "sugaku", daysElapsed: 0 }]);
+  });
+
+  it("fills both slots but refuses a third concurrent research", () => {
+    let state = playing();
+    state = gameReducer(state, { type: "START_RESEARCH", techId: "sugaku" });
+    state = gameReducer(state, { type: "START_RESEARCH", techId: "butsurigaku" });
+    const next = gameReducer(state, { type: "START_RESEARCH", techId: "handoutai" });
+    expect(next).toBe(state);
+  });
+
+  it("refuses a tech whose prerequisites are unmet", () => {
+    const state = playing();
+    const next = gameReducer(state, { type: "START_RESEARCH", techId: "ai-kiso" }); // needs computer-kiso
+    expect(next).toBe(state);
+  });
+
+  it("advances active research on TICK", () => {
+    let state = playing();
+    state = gameReducer(state, { type: "START_RESEARCH", techId: "sugaku" });
+    state = gameReducer(state, { type: "SET_SPEED", speed: 8 });
+    const next = gameReducer(state, { type: "TICK" });
+    expect(next.research.active[0].daysElapsed).toBeCloseTo(8 / 1440);
+  });
+
+  it("completes a tech once its duration has elapsed, applies its effects, and pauses with a notice", () => {
+    let state = playing();
+    state = gameReducer(state, { type: "START_RESEARCH", techId: "sugaku" }); // 90日、効果なし
+    state = {
+      ...state,
+      research: { ...state.research, active: [{ techId: "sugaku", daysElapsed: 90 - 1 / 1440 }] },
+    };
+    state = gameReducer(state, { type: "SET_SPEED", speed: 1 });
+    const next = gameReducer(state, { type: "TICK" });
+    expect(next.research.active).toEqual([]);
+    expect(next.research.completedTechIds).toContain("sugaku");
+    expect(next.gameTime.speed).toBe(0);
+    expect(next.politics.pendingNotices).toEqual([{ kind: "tech_complete", techId: "sugaku" }]);
+  });
+
+  it("unlocks a requiresUnlock tech once its unlock_tech effect fires", () => {
+    let state = playing();
+    state = {
+      ...state,
+      research: {
+        ...state.research,
+        completedTechIds: [...state.research.completedTechIds, "kiso-kagaku", "sugaku", "butsurigaku", "computer-kiso", "ai-kiso"],
+        active: [{ techId: "ai-ouyou", daysElapsed: 280 - 1 / 1440 }],
+      },
+    };
+    state = gameReducer(state, { type: "SET_SPEED", speed: 1 });
+    state = gameReducer(state, { type: "TICK" });
+    expect(state.research.unlockedTechIds).toContain("quantum-computing");
+  });
+});
+
+describe("national focus ↔ research connection (指示書19章)", () => {
+  it("boosts research speed when 科学技術立国 completes", () => {
+    let state = playing();
+    state = {
+      ...state,
+      politics: {
+        ...state.politics,
+        completedFocusIds: [...state.politics.completedFocusIds, "kokunai-seisaku", "shakai-seisaku"],
+        activeFocus: { focusId: "kagaku-gijutsu-rikkoku", daysElapsed: 50 - 1 / 1440 },
+      },
+    };
+    state = gameReducer(state, { type: "SET_SPEED", speed: 1 });
+    const next = gameReducer(state, { type: "TICK" });
+    expect(next.research.speedBonusPercent).toBe(10);
+  });
+});

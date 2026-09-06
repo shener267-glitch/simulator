@@ -43,12 +43,14 @@ export interface FocusEffectResult {
   modifiers: NationalModifier[];
   unlockedFocusIds: string[];
   triggeredEventIds: string[];
+  /** 研究速度への加算ボーナス(%)。Phase 3、指示書19章の国家方針↔研究の接続。 */
+  researchSpeedDelta: number;
 }
 
 /**
- * 国家方針が完了した瞬間に一度だけ適用する効果（指示書14章）。ここで
- * 使えるEffectの語彙は指示書が挙げた8種類ちょうど——後のPhaseでGDPや
- * 防衛力などを足すときも、この形のまま種類を増やせばよい。
+ * 国家方針が完了した瞬間に一度だけ適用する効果（指示書14章、Phase 3で
+ * 研究速度も追加）。GDPや防衛力などを足すときも、この形のまま種類を
+ * 増やせばよい。
  */
 export function applyFocusEffects(
   effects: FocusEffect[],
@@ -62,6 +64,7 @@ export function applyFocusEffects(
   let nextModifiers = modifiers;
   let nextUnlocked = unlockedFocusIds;
   const triggeredEventIds: string[] = [];
+  let researchSpeedDelta = 0;
 
   for (const effect of effects) {
     switch (effect.type) {
@@ -91,10 +94,20 @@ export function applyFocusEffects(
       case "unlock_focus":
         nextUnlocked = nextUnlocked.includes(effect.focusId) ? nextUnlocked : [...nextUnlocked, effect.focusId];
         break;
+      case "modify_research_speed":
+        researchSpeedDelta += effect.amount;
+        break;
     }
   }
 
-  return { stats: nextStats, parties: nextParties, modifiers: nextModifiers, unlockedFocusIds: nextUnlocked, triggeredEventIds };
+  return {
+    stats: nextStats,
+    parties: nextParties,
+    modifiers: nextModifiers,
+    unlockedFocusIds: nextUnlocked,
+    triggeredEventIds,
+    researchSpeedDelta,
+  };
 }
 
 function signed(amount: number): string {
@@ -124,5 +137,7 @@ export function describeFocusEffect(effect: FocusEffect, parties: Party[]): stri
       const unlocked = findFocus(effect.focusId);
       return `「${unlocked?.name ?? effect.focusId}」が選べるようになる`;
     }
+    case "modify_research_speed":
+      return `研究速度 ${signed(effect.amount)}%`;
   }
 }

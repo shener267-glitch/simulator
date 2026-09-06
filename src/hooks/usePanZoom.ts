@@ -49,6 +49,32 @@ function midpoint(points: Point[]): Point {
 }
 
 /**
+ * ズーム・パンの範囲を絞る。「見える範囲の余裕」は画面上の一定量
+ * （marginRatio×viewBox幅/高さ）にする——ここをscaleに比例させると、
+ * ズームするほど許される範囲が狭くなり、拡大するほど地図の端まで
+ * 届かなくなる（実際に踏んだ不具合）。端をきっちり画面端に合わせる
+ * 位置は`辺の長さ*(1-scale)`と`0`——そこからオーバースクロール分だけ
+ * 外側へ広げる。
+ */
+export function clampPanZoom(
+  t: PanZoomTransform,
+  { width, height, minScale = 1, maxScale = 8, marginRatio = 0.4 }: Pick<UsePanZoomOptions, "width" | "height" | "minScale" | "maxScale" | "marginRatio">,
+): PanZoomTransform {
+  const scale = Math.min(maxScale, Math.max(minScale, t.scale));
+  const overscrollX = width * marginRatio;
+  const minX = width * (1 - scale) - overscrollX;
+  const maxX = overscrollX;
+  const overscrollY = height * marginRatio;
+  const minY = height * (1 - scale) - overscrollY;
+  const maxY = overscrollY;
+  return {
+    scale,
+    x: Math.min(maxX, Math.max(minX, t.x)),
+    y: Math.min(maxY, Math.max(minY, t.y)),
+  };
+}
+
+/**
  * SVGキャンバスのパン・ズーム・タップを、Pointer Events APIで自前実装した
  * もの。マウスのドラッグ・ホイールと、タッチのドラッグ・ピンチを同じ
  * 「アンカー点を指の下に保つ」計算で扱う——世界地図（指示書6章）と
@@ -77,21 +103,8 @@ export function usePanZoom<T extends SVGSVGElement>({
   const clampScale = useCallback((scale: number) => Math.min(maxScale, Math.max(minScale, scale)), [minScale, maxScale]);
 
   const clampTransform = useCallback(
-    (t: PanZoomTransform): PanZoomTransform => {
-      const scale = clampScale(t.scale);
-      const marginX = width * marginRatio * scale;
-      const minX = -(width * scale) + marginX;
-      const maxX = width - marginX;
-      const marginY = height * marginRatio * scale;
-      const minY = -(height * scale) + marginY;
-      const maxY = height - marginY;
-      return {
-        scale,
-        x: Math.min(maxX, Math.max(minX, t.x)),
-        y: Math.min(maxY, Math.max(minY, t.y)),
-      };
-    },
-    [width, height, marginRatio, clampScale],
+    (t: PanZoomTransform): PanZoomTransform => clampPanZoom(t, { width, height, minScale, maxScale, marginRatio }),
+    [width, height, minScale, maxScale, marginRatio],
   );
 
   const clientToWorld = useCallback(

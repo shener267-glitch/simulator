@@ -119,8 +119,22 @@ export const JAPAN_FOCUSES: FocusTemplate[] = [
     effects: [
       { type: "modify_stability", amount: 3 },
       { type: "modify_government_support", amount: -2 },
+      { type: "modify_research_speed", amount: -3 },
     ],
     position: { x: 320, y: 460 },
+  },
+  {
+    id: "kagaku-gijutsu-rikkoku",
+    name: "科学技術立国",
+    description: "教育・研究への投資を国家戦略の柱に据える（指示書19章、国家方針と研究の接続）。",
+    durationDays: 50,
+    prerequisites: ["shakai-seisaku"],
+    politicalPowerCost: 20,
+    effects: [
+      { type: "modify_research_speed", amount: 10 },
+      { type: "add_national_modifier", id: "kagaku-gijutsu", label: "科学技術立国" },
+    ],
+    position: { x: 480, y: 460 },
   },
   {
     id: "chiiki-anpo",

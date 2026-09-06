@@ -2,9 +2,12 @@ import { useState } from "react";
 import { WorldMap } from "../map/WorldMap";
 import { Modal } from "../shared/Modal";
 import { CountryInfoPanel } from "../country/CountryInfoPanel";
+import { NationalOverviewPanel } from "../country/NationalOverviewPanel";
 import { PoliticsScreen } from "../politics/PoliticsScreen";
 import { FocusTreeScreen } from "../politics/FocusTreeScreen";
 import { FocusNoticeModal } from "../politics/FocusNoticeModal";
+import { EconomyScreen } from "../economy/EconomyScreen";
+import { ResearchScreen } from "../research/ResearchScreen";
 import { findCountry, findCountryByIsoNumeric } from "../../data/countries";
 import { findFocus } from "../../data/focuses";
 import { formatDateTime } from "../../engine/gameTime";
@@ -149,17 +152,23 @@ export function MainGameScreen() {
         />
       )}
 
-      {state.activeCategory && state.activeCategory !== "politics" && (
+      {state.activeCategory === "economy" && <EconomyScreen onClose={() => dispatch({ type: "OPEN_CATEGORY", id: null })} />}
+
+      {state.activeCategory === "research" && <ResearchScreen onClose={() => dispatch({ type: "OPEN_CATEGORY", id: null })} />}
+
+      {state.activeCategory === "overview" && player && (
+        <Modal title="国家" onClose={() => dispatch({ type: "OPEN_CATEGORY", id: null })}>
+          <NationalOverviewPanel country={player} />
+        </Modal>
+      )}
+
+      {state.activeCategory && !["politics", "economy", "research", "overview"].includes(state.activeCategory) && (
         <Modal title={CATEGORY_LABEL[state.activeCategory]} onClose={() => dispatch({ type: "OPEN_CATEGORY", id: null })}>
-          {state.activeCategory === "overview" && player ? (
-            <CountryInfoPanel isoNumeric={player.isoNumeric} country={player} />
-          ) : (
-            <p className="py-6 text-center text-[0.85rem] text-body-muted">
-              {CATEGORY_LABEL[state.activeCategory]}
-              <br />
-              Phase 3以降で実装予定
-            </p>
-          )}
+          <p className="py-6 text-center text-[0.85rem] text-body-muted">
+            {CATEGORY_LABEL[state.activeCategory]}
+            <br />
+            Phase 4以降で実装予定
+          </p>
         </Modal>
       )}
 

@@ -1,9 +1,17 @@
+import type { BudgetCategory } from "../types/economy";
 import type { CategoryId, FocusNotice, GameState, PoliticsState } from "../types/game";
+import type { ResearchProgress } from "../types/research";
 import type { Speed } from "../types/gameTime";
 import { advanceOneMinute, minutesPerTick } from "../engine/gameTime";
 import { applyFocusEffects, isFocusAvailable, isFocusDone, minutesToDays } from "../engine/focus";
+import { advanceEconomy, applyEconomyEffects, politicalDriftPerDay, schedulePolicyEffects } from "../engine/economy";
+import { advanceResearch, applyTechEffects, isTechAvailable, isTechDone } from "../engine/research";
 import { findFocus } from "../data/focuses";
+import { findEconomyPolicy } from "../data/economyPolicies";
+import { findTech } from "../data/technologies";
 import { createPoliticsState } from "./politics";
+import { createEconomyState } from "./economy";
+import { createResearchState } from "./research";
 
 export type GameAction =
   /** タイトル画面から国家選択画面へ。 */
@@ -23,7 +31,17 @@ export type GameAction =
   /** 国家方針を選んで進め始める（指示書11章：同時に一つだけ）。 */
   | { type: "START_FOCUS"; focusId: string }
   /** 国家方針完了・イベントの通知を読み終えて、次の通知か通常画面へ。 */
-  | { type: "ACK_FOCUS_NOTICE" };
+  | { type: "ACK_FOCUS_NOTICE" }
+  /** 予算配分を変える（指示書4章）。 */
+  | { type: "SET_BUDGET"; category: BudgetCategory; amount: number }
+  /** 経済政策を決める（指示書7・8章）。一度決めた政策は決め直せない。 */
+  | { type: "DECIDE_ECONOMY_POLICY"; policyId: string }
+  /** 研究を始める（指示書11〜16章）。空いている研究枠が要る。 */
+  | { type: "START_RESEARCH"; techId: string };
+
+function clampPercent(value: number): number {
+  return Math.min(100, Math.max(0, value));
+}
 
 function tick(state: GameState): GameState {
   if (state.phase !== "playing" || state.gameTime.speed === 0) return state;
@@ -43,7 +61,40 @@ function tick(state: GameState): GameState {
       ),
     },
   };
+  let economy = state.economy;
+  let research = state.research;
+  let shouldPause = false;
+  const newNotices: FocusNotice[] = [];
 
+  // --- 経済: 決めた政策の、予定されていた段階を適用する（指示書8章） ---
+  const newElapsedMinutes = economy.elapsedMinutes + elapsedMinutes;
+  const due = economy.scheduledEffects.filter((effect) => effect.atMinute <= newElapsedMinutes);
+  const stillPending = economy.scheduledEffects.filter((effect) => effect.atMinute > newElapsedMinutes);
+  let econStats = economy.stats;
+  let econBudget = economy.budget;
+  for (const scheduled of due) {
+    const result = applyEconomyEffects(scheduled.effects, econStats, econBudget);
+    econStats = result.stats;
+    econBudget = result.budget;
+    for (const eventId of result.triggeredEventIds) newNotices.push({ kind: "event", eventId });
+  }
+
+  // --- 経済: 時間経過そのものによる変化（GDP成長・財政赤字の積み上がり、指示書5・6章） ---
+  econStats = advanceEconomy(econStats, econBudget, elapsedDays);
+  economy = { ...economy, stats: econStats, budget: econBudget, scheduledEffects: stillPending, elapsedMinutes: newElapsedMinutes };
+
+  // --- 経済→政治への、ゆるやかな影響（指示書9章） ---
+  const drift = politicalDriftPerDay(econStats);
+  politics = {
+    ...politics,
+    stats: {
+      ...politics.stats,
+      governmentSupport: clampPercent(politics.stats.governmentSupport + drift.governmentSupport * elapsedDays),
+      stability: clampPercent(politics.stats.stability + drift.stability * elapsedDays),
+    },
+  };
+
+  // --- 国家方針の進行 ---
   if (politics.activeFocus) {
     const template = findFocus(politics.activeFocus.focusId);
     const advanced = { ...politics.activeFocus, daysElapsed: politics.activeFocus.daysElapsed + elapsedDays };
@@ -56,10 +107,8 @@ function tick(state: GameState): GameState {
         politics.modifiers,
         politics.unlockedFocusIds,
       );
-      const notices: FocusNotice[] = [
-        { kind: "focus_complete", focusId: template.id },
-        ...result.triggeredEventIds.map((eventId): FocusNotice => ({ kind: "event", eventId })),
-      ];
+      newNotices.push({ kind: "focus_complete", focusId: template.id });
+      for (const eventId of result.triggeredEventIds) newNotices.push({ kind: "event", eventId });
       politics = {
         ...politics,
         stats: result.stats,
@@ -68,16 +117,53 @@ function tick(state: GameState): GameState {
         unlockedFocusIds: result.unlockedFocusIds,
         completedFocusIds: [...politics.completedFocusIds, template.id],
         activeFocus: null,
-        pendingNotices: [...politics.pendingNotices, ...notices],
       };
-      // 国家方針の完了は重要な出来事として自動停止し、確認させる（指示書15章）。
-      return { ...state, gameTime: { ...time, speed: 0 }, politics };
+      research = { ...research, speedBonusPercent: research.speedBonusPercent + result.researchSpeedDelta };
+      shouldPause = true;
+    } else {
+      politics = { ...politics, activeFocus: advanced };
     }
-
-    politics = { ...politics, activeFocus: advanced };
   }
 
-  return { ...state, gameTime: time, politics };
+  // --- 研究の進行（指示書15〜17章） ---
+  if (research.active.length > 0) {
+    const advancedList = advanceResearch(research.active, elapsedDays, research.speedBonusPercent);
+    const stillActive: ResearchProgress[] = [];
+    let completedTechIds = research.completedTechIds;
+    let unlockedTechIds = research.unlockedTechIds;
+    let modifiers = research.modifiers;
+    let speedBonusPercent = research.speedBonusPercent;
+    let politicalStats = politics.stats;
+
+    for (const progress of advancedList) {
+      const template = findTech(progress.techId);
+      if (template && isTechDone(progress, template)) {
+        const result = applyTechEffects(template.effects, politicalStats, modifiers, unlockedTechIds);
+        politicalStats = result.politicalStats;
+        modifiers = result.modifiers;
+        unlockedTechIds = result.unlockedTechIds;
+        speedBonusPercent += result.speedBonusDelta;
+        completedTechIds = [...completedTechIds, template.id];
+        newNotices.push({ kind: "tech_complete", techId: template.id });
+        shouldPause = true;
+      } else {
+        stillActive.push(progress);
+      }
+    }
+
+    politics = { ...politics, stats: politicalStats };
+    research = { ...research, active: stillActive, completedTechIds, unlockedTechIds, modifiers, speedBonusPercent };
+  }
+
+  politics = { ...politics, pendingNotices: [...politics.pendingNotices, ...newNotices] };
+
+  return {
+    ...state,
+    gameTime: shouldPause ? { ...time, speed: 0 } : time,
+    politics,
+    economy,
+    research,
+  };
 }
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
@@ -95,6 +181,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             phase: "playing",
             playerCountryId: state.selectedCountryId,
             politics: createPoliticsState(state.selectedCountryId),
+            economy: createEconomyState(state.selectedCountryId),
+            research: createResearchState(),
           }
         : state;
 
@@ -137,8 +225,56 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, politics: { ...state.politics, pendingNotices: state.politics.pendingNotices.slice(1) } };
     }
 
+    case "SET_BUDGET": {
+      if (state.phase !== "playing") return state;
+      return {
+        ...state,
+        economy: {
+          ...state.economy,
+          budget: { ...state.economy.budget, [action.category]: Math.max(0, action.amount) },
+        },
+      };
+    }
+
+    case "DECIDE_ECONOMY_POLICY": {
+      if (state.phase !== "playing") return state;
+      const economy = state.economy;
+      if (economy.decidedPolicyIds.includes(action.policyId)) return state;
+      const policy = findEconomyPolicy(action.policyId);
+      if (!policy) return state;
+      if (state.politics.stats.politicalPower < policy.politicalPowerCost) return state;
+
+      const scheduledEffects = [...economy.scheduledEffects, ...schedulePolicyEffects(policy, economy.elapsedMinutes)];
+      return {
+        ...state,
+        politics: {
+          ...state.politics,
+          stats: {
+            ...state.politics.stats,
+            politicalPower: state.politics.stats.politicalPower - policy.politicalPowerCost,
+          },
+        },
+        economy: { ...economy, decidedPolicyIds: [...economy.decidedPolicyIds, policy.id], scheduledEffects },
+      };
+    }
+
+    case "START_RESEARCH": {
+      if (state.phase !== "playing") return state;
+      const research = state.research;
+      // 空いている研究枠が要る（指示書12章）。
+      if (research.active.length >= research.slots) return state;
+      const template = findTech(action.techId);
+      if (!template) return state;
+      const activeTechIds = research.active.map((progress) => progress.techId);
+      if (!isTechAvailable(template, research.completedTechIds, research.unlockedTechIds, activeTechIds)) return state;
+
+      return {
+        ...state,
+        research: { ...research, active: [...research.active, { techId: template.id, daysElapsed: 0 }] },
+      };
+    }
+
     default:
       return state;
   }
 }
-
