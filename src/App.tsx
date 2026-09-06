@@ -1,15 +1,23 @@
 import { GameProvider, useGameState } from "./state/GameContext";
 import { useAutosave } from "./hooks/useAutosave";
 import { useGameClock } from "./hooks/useGameClock";
-import { MainScreen } from "./components/main/MainScreen";
-import { MeetingScreen } from "./components/meeting/MeetingScreen";
+import { TitleScreen } from "./components/title/TitleScreen";
+import { CountrySelectScreen } from "./components/select/CountrySelectScreen";
+import { MainGameScreen } from "./components/game/MainGameScreen";
 
 function Game() {
   const state = useGameState();
   useAutosave(state);
   useGameClock();
 
-  return state.mode.kind === "meeting" ? <MeetingScreen /> : <MainScreen />;
+  switch (state.phase) {
+    case "title":
+      return <TitleScreen />;
+    case "select":
+      return <CountrySelectScreen />;
+    case "playing":
+      return <MainGameScreen />;
+  }
 }
 
 export default function App() {

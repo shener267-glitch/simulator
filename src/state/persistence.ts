@@ -13,7 +13,7 @@ export function saveGame(state: GameState): void {
 }
 
 /**
- * 版が違えば捨てる。移行は書かない — v0.3で状態の形が丸ごと変わっており、
+ * 版が違えば捨てる。移行は書かない — Phase 1で状態の形が丸ごと変わっており、
  * 古いセーブを読めるように保つ価値より、読めてしまったときに壊れる危険が勝る。
  */
 export function loadGame(): GameState | null {
@@ -22,9 +22,9 @@ export function loadGame(): GameState | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as GameState;
     if (parsed.saveVersion !== SAVE_VERSION) return null;
-    // 画面の種類・時計が読めないセーブは、routing が判断できないので捨てる。
-    if (typeof parsed.mode?.kind !== "string") return null;
-    if (typeof parsed.clock?.totalMinutes !== "number") return null;
+    // 画面の種類・時間が読めないセーブは、routing が判断できないので捨てる。
+    if (typeof parsed.phase !== "string") return null;
+    if (typeof parsed.gameTime?.year !== "number") return null;
     return parsed;
   } catch {
     return null;

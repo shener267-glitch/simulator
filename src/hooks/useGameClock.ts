@@ -1,15 +1,15 @@
 import { useEffect } from "react";
-import { REAL_MS_PER_TICK } from "../engine/clock";
+import { REAL_MS_PER_TICK } from "../engine/gameTime";
 import { useGameDispatch, useGameState } from "../state/GameContext";
 
-/** 動いている間、現実の1秒ごとにTICKを送る（設計書2章）。 */
+/** 速度が0(一時停止)でない間、現実の1秒ごとにTICKを送る（指示書5章）。 */
 export function useGameClock(): void {
   const state = useGameState();
   const dispatch = useGameDispatch();
 
   useEffect(() => {
-    if (!state.clock.running) return;
+    if (state.phase !== "playing" || state.gameTime.speed === 0) return;
     const id = window.setInterval(() => dispatch({ type: "TICK" }), REAL_MS_PER_TICK);
     return () => window.clearInterval(id);
-  }, [state.clock.running, dispatch]);
+  }, [state.phase, state.gameTime.speed, dispatch]);
 }
