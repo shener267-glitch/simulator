@@ -64,6 +64,20 @@ export const SAWATARI_TREE: TalkTree = {
             highlight: "沢渡と篠塚に、党内の異論の出どころを当たらせた。",
           },
         },
+        {
+          kind: "topic",
+          id: "order-summit",
+          label: "首脳会合の出欠を外務省に伝える",
+          once: true,
+          requiresFlag: "knows-the-summit",
+          flags: ["decided-the-summit"],
+          reply: {
+            minutes: 10,
+            speaker: SAWATARI.shortName,
+            text: "「出席で、外務省にお伝えしておきます」\n\n即答した。迷った様子はなかった。\n\n「就任直後に外へ出る総理は、次も外へ出やすくなります。逆もまた然りです。今回は出ておかれた方がいいと、私は思います」\n\n伝えます、とだけ答えた。四日間の予定が、これで一つ動き出した。",
+            highlight: "首脳会合に出席する、と外務省に返事をした。",
+          },
+        },
       ],
     },
     {
