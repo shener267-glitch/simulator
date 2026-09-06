@@ -13,12 +13,12 @@ describe("the country catalogue", () => {
   });
 
   it("resolves a country by id and by iso numeric code", () => {
-    expect(findCountry("JPN")?.name).toBe("日本");
-    expect(findCountryByIsoNumeric("392")?.id).toBe("JPN");
+    expect(findCountry(COUNTRIES, "JPN")?.name).toBe("日本");
+    expect(findCountryByIsoNumeric(COUNTRIES, "392")?.id).toBe("JPN");
   });
 
   it("defaults the test start country to Japan", () => {
     expect(DEFAULT_COUNTRY_ID).toBe("JPN");
-    expect(findCountry(DEFAULT_COUNTRY_ID)).toBeDefined();
+    expect(findCountry(COUNTRIES, DEFAULT_COUNTRY_ID)).toBeDefined();
   });
 });

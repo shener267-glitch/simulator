@@ -1,7 +1,12 @@
+import { useState } from "react";
 import { WorldMap } from "../map/WorldMap";
 import { Modal } from "../shared/Modal";
 import { CountryInfoPanel } from "../country/CountryInfoPanel";
+import { PoliticsScreen } from "../politics/PoliticsScreen";
+import { FocusTreeScreen } from "../politics/FocusTreeScreen";
+import { FocusNoticeModal } from "../politics/FocusNoticeModal";
 import { findCountry, findCountryByIsoNumeric } from "../../data/countries";
+import { findFocus } from "../../data/focuses";
 import { formatDateTime } from "../../engine/gameTime";
 import type { CategoryId } from "../../types/game";
 import type { Speed } from "../../types/gameTime";
@@ -24,15 +29,44 @@ const CATEGORY_LABEL: Record<CategoryId, string> = Object.fromEntries(
   CATEGORIES.map((c) => [c.id, c.label]),
 ) as Record<CategoryId, string>;
 
-/** メイン画面（指示書4章）。Phase 1では国家欄以外はすべて仮画面。 */
+/** 国家方針の進行カード（指示書19章）。クリックすると国家方針ツリーを開く。 */
+function FocusProgressCard({ onOpen }: { onOpen: () => void }) {
+  const state = useGameState();
+  const activeFocus = state.politics.activeFocus;
+  if (!activeFocus) return null;
+  const template = findFocus(activeFocus.focusId);
+  if (!template) return null;
+
+  const remaining = Math.max(0, Math.ceil(template.durationDays - activeFocus.daysElapsed));
+  const percent = Math.min(100, (activeFocus.daysElapsed / template.durationDays) * 100);
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="mx-4 mb-2 flex flex-col gap-1.5 rounded-lg border border-line bg-ink-panel px-3.5 py-2.5 text-left transition-colors hover:border-brass/40"
+    >
+      <p className="text-[0.75rem] font-medium tracking-wider text-brass">🌳 国家方針</p>
+      <p className="text-[0.9rem] text-body">{template.name}</p>
+      <p className="figures text-[0.75rem] text-body-muted">残り {remaining}日</p>
+      <div className="h-1.5 overflow-hidden rounded-full bg-ink-raised">
+        <div className="h-full rounded-full bg-brass" style={{ width: `${percent}%` }} />
+      </div>
+    </button>
+  );
+}
+
+/** メイン画面（指示書4章）。Phase 2で政治・国家方針が実データを持つ。 */
 export function MainGameScreen() {
   const state = useGameState();
   const dispatch = useGameDispatch();
+  const [focusTreeOpen, setFocusTreeOpen] = useState(false);
 
-  const player = findCountry(state.playerCountryId ?? "");
+  const player = findCountry(state.countries, state.playerCountryId ?? "");
   const inspected = state.inspectingCountryId
-    ? findCountryByIsoNumeric(state.inspectingCountryId)
+    ? findCountryByIsoNumeric(state.countries, state.inspectingCountryId)
     : undefined;
+  const notice = state.politics.pendingNotices[0];
 
   return (
     <div className="flex h-dvh flex-col">
@@ -76,8 +110,11 @@ export function MainGameScreen() {
         </div>
       </header>
 
+      <FocusProgressCard onOpen={() => setFocusTreeOpen(true)} />
+
       <div className="min-h-0 flex-1">
         <WorldMap
+          countries={state.countries}
           selectedIsoNumeric={player?.isoNumeric}
           onSelectCountry={(iso) => dispatch({ type: "INSPECT_COUNTRY", id: iso })}
         />
@@ -105,7 +142,14 @@ export function MainGameScreen() {
         </Modal>
       )}
 
-      {state.activeCategory && (
+      {state.activeCategory === "politics" && (
+        <PoliticsScreen
+          onClose={() => dispatch({ type: "OPEN_CATEGORY", id: null })}
+          onOpenFocusTree={() => setFocusTreeOpen(true)}
+        />
+      )}
+
+      {state.activeCategory && state.activeCategory !== "politics" && (
         <Modal title={CATEGORY_LABEL[state.activeCategory]} onClose={() => dispatch({ type: "OPEN_CATEGORY", id: null })}>
           {state.activeCategory === "overview" && player ? (
             <CountryInfoPanel isoNumeric={player.isoNumeric} country={player} />
@@ -113,11 +157,15 @@ export function MainGameScreen() {
             <p className="py-6 text-center text-[0.85rem] text-body-muted">
               {CATEGORY_LABEL[state.activeCategory]}
               <br />
-              Phase 2で実装予定
+              Phase 3以降で実装予定
             </p>
           )}
         </Modal>
       )}
+
+      {focusTreeOpen && <FocusTreeScreen onClose={() => setFocusTreeOpen(false)} />}
+
+      {notice && <FocusNoticeModal notice={notice} />}
     </div>
   );
 }

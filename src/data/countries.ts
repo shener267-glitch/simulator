@@ -119,12 +119,18 @@ export const COUNTRIES: Country[] = [
   },
 ];
 
-export function findCountry(id: string): Country | undefined {
-  return COUNTRIES.find((country) => country.id === id);
+/**
+ * `countries`は呼び出し側から渡す——`state.countries`（ゲーム内で変わりうる、
+ * その時点の値）を見るためで、この静的なカタログを直接見るためではない。
+ * 後のPhaseで経済・人口などが変化するようになったとき、ここが static な
+ * `COUNTRIES`のままだと変化が一切反映されなくなる、という落とし穴を避ける。
+ */
+export function findCountry(countries: Country[], id: string): Country | undefined {
+  return countries.find((country) => country.id === id);
 }
 
-export function findCountryByIsoNumeric(isoNumeric: string): Country | undefined {
-  return COUNTRIES.find((country) => country.isoNumeric === isoNumeric);
+export function findCountryByIsoNumeric(countries: Country[], isoNumeric: string): Country | undefined {
+  return countries.find((country) => country.isoNumeric === isoNumeric);
 }
 
 /** Phase 1のテスト開始国（指示書3章）。 */

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { WorldMap } from "../map/WorldMap";
 import { CountryInfoPanel } from "../country/CountryInfoPanel";
-import { COUNTRIES, findCountry, findCountryByIsoNumeric } from "../../data/countries";
+import { findCountry, findCountryByIsoNumeric } from "../../data/countries";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
 
 /**
@@ -14,19 +14,19 @@ export function CountrySelectScreen() {
   const dispatch = useGameDispatch();
   const [previewIso, setPreviewIso] = useState<string | null>(null);
 
-  const selected = findCountry(state.selectedCountryId);
-  const previewedCountry = previewIso ? findCountryByIsoNumeric(previewIso) : selected;
+  const selected = findCountry(state.countries, state.selectedCountryId);
+  const previewedCountry = previewIso ? findCountryByIsoNumeric(state.countries, previewIso) : selected;
   const displayIso = previewIso ?? selected?.isoNumeric ?? "";
   const canStart = Boolean(previewedCountry);
 
   function selectPlayable(id: string) {
-    setPreviewIso(findCountry(id)?.isoNumeric ?? null);
+    setPreviewIso(findCountry(state.countries, id)?.isoNumeric ?? null);
     dispatch({ type: "SELECT_COUNTRY", id });
   }
 
   function handleMapClick(isoNumeric: string) {
     setPreviewIso(isoNumeric);
-    const country = findCountryByIsoNumeric(isoNumeric);
+    const country = findCountryByIsoNumeric(state.countries, isoNumeric);
     if (country) dispatch({ type: "SELECT_COUNTRY", id: country.id });
   }
 
@@ -37,7 +37,7 @@ export function CountrySelectScreen() {
       </p>
 
       <div className="flex gap-2 overflow-x-auto px-4 pb-2">
-        {COUNTRIES.map((country) => (
+        {state.countries.map((country) => (
           <button
             key={country.id}
             type="button"
@@ -55,7 +55,7 @@ export function CountrySelectScreen() {
       </div>
 
       <div className="min-h-0 flex-1">
-        <WorldMap selectedIsoNumeric={displayIso} onSelectCountry={handleMapClick} />
+        <WorldMap countries={state.countries} selectedIsoNumeric={displayIso} onSelectCountry={handleMapClick} />
       </div>
 
       <div className="flex flex-col gap-4 border-t border-line bg-ink-panel px-5 pt-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
