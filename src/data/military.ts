@@ -9,6 +9,7 @@ import type {
   PersonnelStats,
   ProductionItemId,
   ProductionLine,
+  Province,
   Unit,
 } from "../types/military";
 
@@ -49,6 +50,70 @@ export const REGION_ADJACENCY: Record<MilitaryRegionId, MilitaryRegionId[]> = {
 };
 
 /**
+ * プロヴィンス（HOI4型改訂・指示書1〜2章）。作戦地図をさらに細かい区画に
+ * 分割し、師団・艦隊を1マス単位で選択・移動できるようにする。
+ *
+ * 【ゲーム上の設定】区画そのもの・地形・インフラ・補給・要塞化度は、
+ * この改訂のための創作。日本国内は初期状態ですべて自国領——他国の
+ * 実在の領有権を主張するものではない（`contested`は戦争中だけ立つ、
+ * 純粋にゲーム上の前線フラグ）。基地の実在の所在地（札幌・仙台・朝霞・
+ * 熊本・那覇・横須賀・佐世保・千歳・百里）に対応するプロヴィンスへ、
+ * それぞれの基地・部隊を配置した。
+ */
+export const JAPAN_PROVINCES: Province[] = [
+  { id: "sapporo-chitose", name: "札幌・千歳", regionId: "hokkaido", kind: "land", terrain: "urban", ownerCountryId: "JPN", infrastructureLevel: 8, supplyLevel: 90, hasCity: true, hasPort: false, baseId: "sapporo-camp", fortificationLevel: 3, contested: false, position: { x: 195, y: 45 } },
+  { id: "hokkaido-rural", name: "道東", regionId: "hokkaido", kind: "land", terrain: "forest", ownerCountryId: "JPN", infrastructureLevel: 3, supplyLevel: 60, hasCity: false, hasPort: false, fortificationLevel: 1, contested: false, position: { x: 228, y: 62 } },
+  { id: "sendai-province", name: "仙台", regionId: "tohoku", kind: "land", terrain: "urban", ownerCountryId: "JPN", infrastructureLevel: 7, supplyLevel: 85, hasCity: true, hasPort: false, baseId: "sendai-camp", fortificationLevel: 2, contested: false, position: { x: 216, y: 145 } },
+  { id: "tohoku-rural", name: "東北山間部", regionId: "tohoku", kind: "land", terrain: "mountains", ownerCountryId: "JPN", infrastructureLevel: 3, supplyLevel: 55, hasCity: false, hasPort: false, fortificationLevel: 1, contested: false, position: { x: 246, y: 158 } },
+  { id: "tokyo-metro", name: "東京", regionId: "kanto", kind: "land", terrain: "urban", ownerCountryId: "JPN", infrastructureLevel: 10, supplyLevel: 95, hasCity: true, hasPort: false, baseId: "asaka-camp", fortificationLevel: 3, contested: false, position: { x: 235, y: 245 } },
+  { id: "yokosuka-hyakuri", name: "横須賀・百里", regionId: "kanto", kind: "land", terrain: "coastal", ownerCountryId: "JPN", infrastructureLevel: 8, supplyLevel: 90, hasCity: false, hasPort: true, baseId: "yokosuka-base", fortificationLevel: 4, contested: false, position: { x: 266, y: 258 } },
+  { id: "chubu-coast", name: "中部沿岸", regionId: "chubu", kind: "land", terrain: "coastal", ownerCountryId: "JPN", infrastructureLevel: 6, supplyLevel: 75, hasCity: true, hasPort: true, fortificationLevel: 2, contested: false, position: { x: 176, y: 313 } },
+  { id: "chubu-mountain", name: "中部山岳部", regionId: "chubu", kind: "land", terrain: "mountains", ownerCountryId: "JPN", infrastructureLevel: 3, supplyLevel: 55, hasCity: false, hasPort: false, fortificationLevel: 1, contested: false, position: { x: 204, y: 328 } },
+  { id: "kinki-urban", name: "近畿都市部", regionId: "kinki", kind: "land", terrain: "urban", ownerCountryId: "JPN", infrastructureLevel: 8, supplyLevel: 85, hasCity: true, hasPort: true, fortificationLevel: 2, contested: false, position: { x: 146, y: 394 } },
+  { id: "kinki-rural", name: "近畿郊外", regionId: "kinki", kind: "land", terrain: "plains", ownerCountryId: "JPN", infrastructureLevel: 4, supplyLevel: 65, hasCity: false, hasPort: false, fortificationLevel: 1, contested: false, position: { x: 174, y: 407 } },
+  { id: "chugoku-coast", name: "中国沿岸", regionId: "chugoku", kind: "land", terrain: "coastal", ownerCountryId: "JPN", infrastructureLevel: 5, supplyLevel: 70, hasCity: true, hasPort: true, fortificationLevel: 1, contested: false, position: { x: 96, y: 454 } },
+  { id: "chugoku-inland", name: "中国山間部", regionId: "chugoku", kind: "land", terrain: "mountains", ownerCountryId: "JPN", infrastructureLevel: 3, supplyLevel: 55, hasCity: false, hasPort: false, fortificationLevel: 1, contested: false, position: { x: 124, y: 467 } },
+  { id: "shikoku-north", name: "四国北部", regionId: "shikoku", kind: "land", terrain: "coastal", ownerCountryId: "JPN", infrastructureLevel: 4, supplyLevel: 65, hasCity: true, hasPort: true, fortificationLevel: 1, contested: false, position: { x: 176, y: 484 } },
+  { id: "shikoku-south", name: "四国南部", regionId: "shikoku", kind: "land", terrain: "forest", ownerCountryId: "JPN", infrastructureLevel: 3, supplyLevel: 55, hasCity: false, hasPort: false, fortificationLevel: 1, contested: false, position: { x: 204, y: 497 } },
+  { id: "kumamoto-province", name: "熊本", regionId: "kyushu", kind: "land", terrain: "plains", ownerCountryId: "JPN", infrastructureLevel: 6, supplyLevel: 75, hasCity: true, hasPort: false, baseId: "kumamoto-camp", fortificationLevel: 2, contested: false, position: { x: 96, y: 534 } },
+  { id: "sasebo-province", name: "佐世保", regionId: "kyushu", kind: "land", terrain: "coastal", ownerCountryId: "JPN", infrastructureLevel: 6, supplyLevel: 80, hasCity: false, hasPort: true, baseId: "sasebo-base", fortificationLevel: 3, contested: false, position: { x: 124, y: 547 } },
+  { id: "naha-province", name: "那覇", regionId: "nansei", kind: "land", terrain: "coastal", ownerCountryId: "JPN", infrastructureLevel: 6, supplyLevel: 70, hasCity: true, hasPort: true, baseId: "naha-camp", fortificationLevel: 3, contested: false, position: { x: 116, y: 645 } },
+  { id: "nansei-outer", name: "南西諸島外縁部", regionId: "nansei", kind: "land", terrain: "coastal", ownerCountryId: "JPN", infrastructureLevel: 2, supplyLevel: 40, hasCity: false, hasPort: false, fortificationLevel: 1, contested: false, position: { x: 142, y: 658 } },
+  { id: "sea-of-japan-zone", name: "日本海海域", regionId: "sea_of_japan", kind: "sea", terrain: "sea", ownerCountryId: "JPN", infrastructureLevel: 0, supplyLevel: 60, hasCity: false, hasPort: false, fortificationLevel: 0, contested: false, position: { x: 90, y: 190 } },
+  { id: "east-china-sea-zone", name: "東シナ海海域", regionId: "east_china_sea", kind: "sea", terrain: "sea", ownerCountryId: "JPN", infrastructureLevel: 0, supplyLevel: 55, hasCity: false, hasPort: false, fortificationLevel: 0, contested: false, position: { x: 40, y: 590 } },
+  { id: "pacific-ocean-zone", name: "太平洋海域", regionId: "pacific_ocean", kind: "sea", terrain: "sea", ownerCountryId: "JPN", infrastructureLevel: 0, supplyLevel: 60, hasCity: false, hasPort: false, fortificationLevel: 0, contested: false, position: { x: 340, y: 340 } },
+];
+
+/** プロヴィンス間の隣接関係（HOI4型改訂・指示書3章、移動時間の計算に使う）。 */
+export const PROVINCE_ADJACENCY: Record<string, string[]> = {
+  "sapporo-chitose": ["hokkaido-rural", "sea-of-japan-zone"],
+  "hokkaido-rural": ["sapporo-chitose", "sendai-province", "pacific-ocean-zone"],
+  "sendai-province": ["hokkaido-rural", "tohoku-rural", "sea-of-japan-zone"],
+  "tohoku-rural": ["sendai-province", "tokyo-metro", "pacific-ocean-zone"],
+  "tokyo-metro": ["tohoku-rural", "yokosuka-hyakuri", "chubu-mountain"],
+  "yokosuka-hyakuri": ["tokyo-metro", "pacific-ocean-zone"],
+  "chubu-mountain": ["tokyo-metro", "chubu-coast", "kinki-rural"],
+  "chubu-coast": ["chubu-mountain", "sea-of-japan-zone", "pacific-ocean-zone"],
+  "kinki-rural": ["chubu-mountain", "kinki-urban", "chugoku-inland"],
+  "kinki-urban": ["kinki-rural", "shikoku-north", "sea-of-japan-zone"],
+  "chugoku-inland": ["kinki-rural", "chugoku-coast", "kumamoto-province"],
+  "chugoku-coast": ["chugoku-inland", "sea-of-japan-zone", "east-china-sea-zone"],
+  "shikoku-north": ["kinki-urban", "shikoku-south", "pacific-ocean-zone"],
+  "shikoku-south": ["shikoku-north", "pacific-ocean-zone"],
+  "kumamoto-province": ["chugoku-inland", "sasebo-province", "east-china-sea-zone"],
+  "sasebo-province": ["kumamoto-province", "east-china-sea-zone", "sea-of-japan-zone"],
+  "naha-province": ["nansei-outer", "east-china-sea-zone", "pacific-ocean-zone"],
+  "nansei-outer": ["naha-province", "east-china-sea-zone", "pacific-ocean-zone"],
+  "sea-of-japan-zone": ["sapporo-chitose", "sendai-province", "chubu-coast", "kinki-urban", "chugoku-coast", "sasebo-province"],
+  "east-china-sea-zone": ["chugoku-coast", "kumamoto-province", "sasebo-province", "naha-province", "nansei-outer"],
+  "pacific-ocean-zone": ["hokkaido-rural", "tohoku-rural", "yokosuka-hyakuri", "chubu-coast", "shikoku-north", "shikoku-south", "naha-province", "nansei-outer"],
+};
+
+export function findProvince(provinces: Province[], id: string): Province | undefined {
+  return provinces.find((province) => province.id === id);
+}
+
+/**
  * 自衛隊の基地・部隊・艦隊・航空団（指示書33章）。
  *
  * 【事実】基地の名称・所在地・部隊名（第1〜第8師団、第15旅団、横須賀・
@@ -60,30 +125,30 @@ export const REGION_ADJACENCY: Record<MilitaryRegionId, MilitaryRegionId[]> = {
  * 公表されている正式な統計そのものではない。
  */
 export const JAPAN_BASES: Base[] = [
-  { id: "sapporo-camp", name: "札幌駐屯地（北部方面隊）", kind: "army", regionId: "hokkaido" },
-  { id: "sendai-camp", name: "仙台駐屯地（東北方面隊）", kind: "army", regionId: "tohoku" },
-  { id: "asaka-camp", name: "朝霞駐屯地（東部方面隊）", kind: "army", regionId: "kanto" },
-  { id: "kumamoto-camp", name: "熊本駐屯地（西部方面隊）", kind: "army", regionId: "kyushu" },
-  { id: "naha-camp", name: "那覇駐屯地", kind: "army", regionId: "nansei" },
-  { id: "yokosuka-base", name: "横須賀基地", kind: "navy", regionId: "kanto" },
-  { id: "sasebo-base", name: "佐世保基地", kind: "navy", regionId: "kyushu" },
-  { id: "chitose-base", name: "千歳基地", kind: "air", regionId: "hokkaido" },
-  { id: "hyakuri-base", name: "百里基地", kind: "air", regionId: "kanto" },
-  { id: "naha-airbase", name: "那覇基地", kind: "air", regionId: "nansei" },
+  { id: "sapporo-camp", name: "札幌駐屯地（北部方面隊）", kind: "army", regionId: "hokkaido", provinceId: "sapporo-chitose" },
+  { id: "sendai-camp", name: "仙台駐屯地（東北方面隊）", kind: "army", regionId: "tohoku", provinceId: "sendai-province" },
+  { id: "asaka-camp", name: "朝霞駐屯地（東部方面隊）", kind: "army", regionId: "kanto", provinceId: "tokyo-metro" },
+  { id: "kumamoto-camp", name: "熊本駐屯地（西部方面隊）", kind: "army", regionId: "kyushu", provinceId: "kumamoto-province" },
+  { id: "naha-camp", name: "那覇駐屯地", kind: "army", regionId: "nansei", provinceId: "naha-province" },
+  { id: "yokosuka-base", name: "横須賀基地", kind: "navy", regionId: "kanto", provinceId: "yokosuka-hyakuri" },
+  { id: "sasebo-base", name: "佐世保基地", kind: "navy", regionId: "kyushu", provinceId: "sasebo-province" },
+  { id: "chitose-base", name: "千歳基地", kind: "air", regionId: "hokkaido", provinceId: "sapporo-chitose" },
+  { id: "hyakuri-base", name: "百里基地", kind: "air", regionId: "kanto", provinceId: "yokosuka-hyakuri" },
+  { id: "naha-airbase", name: "那覇基地", kind: "air", regionId: "nansei", provinceId: "naha-province" },
 ];
 
 export const JAPAN_UNITS: Unit[] = [
-  { id: "div2", name: "第2師団", branch: "gsdf", personnel: { current: 5600, max: 7000 }, equipmentRatePercent: 80, moralePercent: 88, baseId: "sapporo-camp", regionId: "hokkaido", status: "garrison" },
-  { id: "div6", name: "第6師団", branch: "gsdf", personnel: { current: 5100, max: 6500 }, equipmentRatePercent: 78, moralePercent: 86, baseId: "sendai-camp", regionId: "tohoku", status: "garrison" },
-  { id: "div1", name: "第1師団", branch: "gsdf", personnel: { current: 6200, max: 7500 }, equipmentRatePercent: 82, moralePercent: 87, baseId: "asaka-camp", regionId: "kanto", status: "garrison" },
-  { id: "div8", name: "第8師団", branch: "gsdf", personnel: { current: 5300, max: 6800 }, equipmentRatePercent: 79, moralePercent: 85, baseId: "kumamoto-camp", regionId: "kyushu", status: "garrison" },
-  { id: "brigade15", name: "第15旅団", branch: "gsdf", personnel: { current: 1900, max: 2400 }, equipmentRatePercent: 76, moralePercent: 90, baseId: "naha-camp", regionId: "nansei", status: "garrison" },
+  { id: "div2", name: "第2師団", branch: "gsdf", personnel: { current: 5600, max: 7000 }, equipmentRatePercent: 80, moralePercent: 88, baseId: "sapporo-camp", regionId: "hokkaido", provinceId: "sapporo-chitose", status: "garrison" },
+  { id: "div6", name: "第6師団", branch: "gsdf", personnel: { current: 5100, max: 6500 }, equipmentRatePercent: 78, moralePercent: 86, baseId: "sendai-camp", regionId: "tohoku", provinceId: "sendai-province", status: "garrison" },
+  { id: "div1", name: "第1師団", branch: "gsdf", personnel: { current: 6200, max: 7500 }, equipmentRatePercent: 82, moralePercent: 87, baseId: "asaka-camp", regionId: "kanto", provinceId: "tokyo-metro", status: "garrison" },
+  { id: "div8", name: "第8師団", branch: "gsdf", personnel: { current: 5300, max: 6800 }, equipmentRatePercent: 79, moralePercent: 85, baseId: "kumamoto-camp", regionId: "kyushu", provinceId: "kumamoto-province", status: "garrison" },
+  { id: "brigade15", name: "第15旅団", branch: "gsdf", personnel: { current: 1900, max: 2400 }, equipmentRatePercent: 76, moralePercent: 90, baseId: "naha-camp", regionId: "nansei", provinceId: "naha-province", status: "garrison" },
 ];
 
 export const JAPAN_FLEETS: Fleet[] = [
-  { id: "escort-flotilla-1", name: "第1護衛隊群", destroyers: 8, submarines: 0, supplyShips: 1, baseId: "yokosuka-base", regionId: "pacific_ocean", mission: "escort" },
-  { id: "escort-flotilla-2", name: "第2護衛隊群", destroyers: 8, submarines: 0, supplyShips: 1, baseId: "sasebo-base", regionId: "east_china_sea", mission: "patrol" },
-  { id: "submarine-flotilla", name: "潜水艦隊", destroyers: 0, submarines: 6, supplyShips: 0, baseId: "yokosuka-base", regionId: "sea_of_japan", mission: "asw" },
+  { id: "escort-flotilla-1", name: "第1護衛隊群", destroyers: 8, submarines: 0, supplyShips: 1, baseId: "yokosuka-base", regionId: "pacific_ocean", provinceId: "pacific-ocean-zone", mission: "escort", status: "garrison" },
+  { id: "escort-flotilla-2", name: "第2護衛隊群", destroyers: 8, submarines: 0, supplyShips: 1, baseId: "sasebo-base", regionId: "east_china_sea", provinceId: "east-china-sea-zone", mission: "patrol", status: "garrison" },
+  { id: "submarine-flotilla", name: "潜水艦隊", destroyers: 0, submarines: 6, supplyShips: 0, baseId: "yokosuka-base", regionId: "sea_of_japan", provinceId: "sea-of-japan-zone", mission: "asw", status: "garrison" },
 ];
 
 export const JAPAN_AIR_WINGS: AirWing[] = [

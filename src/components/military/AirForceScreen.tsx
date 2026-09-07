@@ -2,12 +2,22 @@ import { useState } from "react";
 import { Panel } from "../shared/Panel";
 import { Modal } from "../shared/Modal";
 import { MILITARY_REGION_LABELS } from "../../data/military";
-import type { AirWingMission } from "../../types/military";
+import type { AirWingMission, MilitaryRegionId } from "../../types/military";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
 
-const MISSION_LABELS: Record<AirWingMission, string> = { air_defense: "防空", intercept: "迎撃", air_superiority: "航空優勢" };
+const MISSION_LABELS: Record<AirWingMission, string> = {
+  air_defense: "防空",
+  intercept: "迎撃",
+  air_superiority: "航空優勢",
+  anti_ship: "対艦攻撃",
+  close_air_support: "近接航空支援",
+  reconnaissance: "偵察",
+};
 
-/** 航空戦力画面（指示書9・10章）。航空機は基地に配置し、航続圏内の地域をカバーする。 */
+/**
+ * 航空戦力画面（指示書7・9・10章、HOI4型改訂）。基地→航空団→作戦地域→
+ * 任務、という順で指定する。航空機は基地からの航続圏内でしか作戦できない。
+ */
 export function AirForceScreen({ onClose }: { onClose: () => void }) {
   const state = useGameState();
   const dispatch = useGameDispatch();
@@ -35,9 +45,9 @@ export function AirForceScreen({ onClose }: { onClose: () => void }) {
                   ✈️ 戦闘機×{wing.fighters} {wing.supportAircraft > 0 && `🛩 支援機×${wing.supportAircraft}`}
                 </p>
                 <p className="text-[0.78rem] text-body-muted">
-                  {base?.name ?? "—"} ・ 任務：{MISSION_LABELS[wing.mission]}
+                  {base?.name ?? "—"} ・ 作戦地域：{wing.targetRegionId ? MILITARY_REGION_LABELS[wing.targetRegionId] : "未指定"} ・ 任務：{MISSION_LABELS[wing.mission]}
                 </p>
-                <p className="text-[0.75rem] text-body-muted">カバー地域：{wing.coverageRegionIds.map((id) => MILITARY_REGION_LABELS[id]).join("、")}</p>
+                <p className="text-[0.75rem] text-body-muted">航続圏：{wing.coverageRegionIds.map((id) => MILITARY_REGION_LABELS[id]).join("、")}</p>
               </button>
             );
           })
@@ -48,7 +58,25 @@ export function AirForceScreen({ onClose }: { onClose: () => void }) {
         <Modal title={openWing.name} onClose={() => setOpenWingId(null)}>
           <div className="flex flex-col gap-4">
             <p className="text-[0.85rem] text-body-muted">配置基地：{bases.find((b) => b.id === openWing.baseId)?.name ?? "—"}</p>
-            <p className="text-[0.85rem] text-body-muted">航続圏内のカバー地域：{openWing.coverageRegionIds.map((id) => MILITARY_REGION_LABELS[id]).join("、")}（基地からの航続距離で決まる）</p>
+
+            <div>
+              <p className="mb-2 text-[0.75rem] font-medium tracking-wider text-brass">作戦地域（航続圏内）</p>
+              <div className="flex flex-wrap gap-1.5">
+                {openWing.coverageRegionIds.map((regionId) => (
+                  <button
+                    key={regionId}
+                    type="button"
+                    onClick={() => dispatch({ type: "SET_AIRWING_TARGET", airWingId: openWing.id, targetRegionId: regionId as MilitaryRegionId })}
+                    className={`rounded-full border px-3 py-1.5 text-[0.78rem] transition-colors ${
+                      regionId === openWing.targetRegionId ? "border-brass bg-brass/15 text-brass" : "border-line text-body-muted"
+                    }`}
+                  >
+                    {MILITARY_REGION_LABELS[regionId]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div>
               <p className="mb-2 text-[0.75rem] font-medium tracking-wider text-brass">任務</p>
               <div className="flex flex-col gap-1.5">

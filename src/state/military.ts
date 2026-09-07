@@ -1,6 +1,6 @@
 import type { IntelSnapshot, MilitaryState } from "../types/military";
 import type { Country } from "../types/country";
-import { FOREIGN_MILITARY_BASELINE, JAPAN_AIR_WINGS, JAPAN_BASES, JAPAN_FLEETS, JAPAN_FORCES, JAPAN_PERSONNEL, JAPAN_PRODUCTION_LINES, JAPAN_UNITS } from "../data/military";
+import { FOREIGN_MILITARY_BASELINE, JAPAN_AIR_WINGS, JAPAN_BASES, JAPAN_FLEETS, JAPAN_FORCES, JAPAN_PERSONNEL, JAPAN_PRODUCTION_LINES, JAPAN_PROVINCES, JAPAN_UNITS } from "../data/military";
 
 const EMPTY_FORCES = {
   land: { capability: 0, units: 0, tanksArmor: 0, artillery: 0, airDefenseUnits: 0, longRangeFire: 0 },
@@ -43,6 +43,7 @@ export function createMilitaryState(countryId: string, allCountries: Country[]):
       readiness: "normal",
       mobilization: "peacetime",
       conscriptionPolicy: "volunteer",
+      provinces: JAPAN_PROVINCES.map((province) => ({ ...province, position: { ...province.position } })),
       bases: JAPAN_BASES.map((base) => ({ ...base })),
       units: JAPAN_UNITS.map((unit) => ({ ...unit, personnel: { ...unit.personnel } })),
       fleets: JAPAN_FLEETS.map((fleet) => ({ ...fleet })),
@@ -70,6 +71,7 @@ export function createMilitaryState(countryId: string, allCountries: Country[]):
     readiness: "normal",
     mobilization: "peacetime",
     conscriptionPolicy: "volunteer",
+    provinces: [],
     bases: [],
     units: [],
     fleets: [],

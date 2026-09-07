@@ -18,6 +18,7 @@ import type {
   Operation,
   OperationPriority,
   ReadinessLevel,
+  UnitOrder,
 } from "../types/military";
 import { advanceOneMinute, minutesPerTick } from "../engine/gameTime";
 import { applyFocusEffects, isFocusAvailable, isFocusDone, minutesToDays } from "../engine/focus";
@@ -55,15 +56,17 @@ import {
   bindMilitaryEffectsToCountry,
   driftFrontStatus,
   driftIntel,
+  markFrontProvincesContested,
+  provinceTravelDays,
+  resolveLandCombat,
   rollArmedAttack,
   rollMilitaryEvent,
-  travelDays,
 } from "../engine/military";
 import { findFocus } from "../data/focuses";
 import { findEconomyPolicy } from "../data/economyPolicies";
 import { findTech } from "../data/technologies";
 import { SUMMIT_PREP_DAYS, findDiplomaticAction, findDiplomaticCrisis, findTreaty } from "../data/diplomacy";
-import { FOREIGN_MILITARY_BASELINE, MILITARY_REGION_LABELS, REGION_ADJACENCY, findAllianceCooperation, findMilitaryEvent } from "../data/military";
+import { FOREIGN_MILITARY_BASELINE, REGION_ADJACENCY, findAllianceCooperation, findMilitaryEvent, findProvince } from "../data/military";
 import { createPoliticsState } from "./politics";
 import { createEconomyState } from "./economy";
 import { createResearchState } from "./research";
@@ -119,13 +122,23 @@ export type GameAction =
   | { type: "SET_MOBILIZATION"; state: MobilizationState }
   /** 徴募制度を変える（指示書13章）。政治システムと接続する。 */
   | { type: "SET_CONSCRIPTION_POLICY"; policy: ConscriptionPolicyId }
-  /** 部隊を移動させる（指示書7章）。移動には時間がかかる。 */
-  | { type: "MOVE_UNIT"; unitId: string; destinationRegionId: MilitaryRegionId }
+  /**
+   * 選んだ師団（複数可）を、隣接プロヴィンスへ直接移動させる（HOI4型改訂・
+   * 指示書1・3章）。移動には時間がかかる。係争プロヴィンスへの移動命令は
+   * 到着時に自動的に戦闘として解決される（攻撃命令を兼ねる）。
+   */
+  | { type: "MOVE_UNITS"; unitIds: string[]; destinationProvinceId: string }
+  /** 部隊に防御命令を出す（指示書4章）。地形ボーナスに加えて小さな防御加算を受ける。 */
+  | { type: "SET_UNIT_ORDER"; unitId: string; order: UnitOrder | null }
+  /** 艦隊を海域プロヴィンスへ直接移動させる（HOI4型改訂・指示書6章）。 */
+  | { type: "MOVE_FLEET"; fleetId: string; destinationProvinceId: string }
   /** 艦隊の任務を変える（指示書8章）。 */
   | { type: "SET_FLEET_MISSION"; fleetId: string; mission: FleetMission }
   /** 航空団の任務を変える（指示書9章）。 */
   | { type: "SET_AIRWING_MISSION"; airWingId: string; mission: AirWingMission }
-  /** 作戦を立ち上げる（指示書25・26章）。部隊の1マスずつの操作はしない。 */
+  /** 航空団の作戦地域を指定する（HOI4型改訂・指示書7章）。航続圏内のみ指定できる。 */
+  | { type: "SET_AIRWING_TARGET"; airWingId: string; targetRegionId: MilitaryRegionId }
+  /** 作戦を立ち上げる（指示書25・26章）。前線をAIに任せる場合の枠組み——個別の師団の手動操作とは独立して併用できる。 */
   | { type: "START_OPERATION"; name: string; objective: string; regionId: MilitaryRegionId; priority: OperationPriority; unitIds: string[]; fleetIds: string[]; airWingIds: string[] }
   /** 作戦を終了する。 */
   | { type: "END_OPERATION"; operationId: string }
@@ -310,18 +323,59 @@ function tick(state: GameState): GameState {
     governmentSupportFromMilitary += result.governmentSupportDelta;
   }
 
-  // 部隊の移動——到着予定時刻に達したら、駐屯地扱いに戻す（指示書7章）。
+  // 部隊の移動——到着予定時刻に達したら、駐屯地扱いに戻す。係争プロヴィンス
+  // （HOI4型改訂・指示書3・4章）へ到着した場合は、そのまま簡略化した陸上戦闘
+  // を解決する。
+  let militaryProvinces = military.provinces;
   const militaryUnits = military.units.map((unit) => {
-    if (unit.status === "moving" && unit.arrivalAtMinute !== undefined && unit.arrivalAtMinute <= newMilitaryElapsedMinutes) {
-      const destination = unit.destinationRegionId!;
-      militaryEventLog.push({
-        id: `arrive-${unit.id}-${newMilitaryElapsedMinutes}`,
-        atMinute: newMilitaryElapsedMinutes,
-        text: `${unit.name}が${MILITARY_REGION_LABELS[destination]}に到着した。`,
-      });
-      return { ...unit, status: "garrison" as const, regionId: destination, destinationRegionId: undefined, arrivalAtMinute: undefined };
+    if (unit.status !== "moving" || unit.arrivalAtMinute === undefined || unit.arrivalAtMinute > newMilitaryElapsedMinutes) {
+      // 防御命令中の部隊は、持ち場を固めることでわずかに士気が回復する。
+      if (unit.order === "defend" && unit.status === "garrison") {
+        return { ...unit, moralePercent: Math.min(100, unit.moralePercent + 0.3 * elapsedDays) };
+      }
+      return unit;
     }
-    return unit;
+    const destinationId = unit.destinationProvinceId!;
+    const destination = findProvince(militaryProvinces, destinationId);
+    const origin = unit.originProvinceId ?? unit.provinceId;
+
+    if (destination?.contested) {
+      const enemyLandEstimate = military.war ? (military.intel[military.war.enemyCountryId]?.landEstimate ?? 30) : 30;
+      const result = resolveLandCombat(unit, destination, enemyLandEstimate, Math.random);
+      if (result.provinceSecured) {
+        militaryProvinces = militaryProvinces.map((province) => (province.id === destinationId ? { ...province, contested: false } : province));
+      }
+      const outcomeLabel = result.outcome === "victory" ? "勝利" : result.outcome === "defeat" ? "敗北" : "膠着";
+      militaryEventLog.push({
+        id: `combat-${unit.id}-${newMilitaryElapsedMinutes}`,
+        atMinute: newMilitaryElapsedMinutes,
+        text: `${unit.name}が${destination.name}で交戦——${outcomeLabel}。`,
+        confidence: "high",
+      });
+      const settledProvinceId = result.outcome === "defeat" ? origin : destinationId;
+      const settledRegionId = findProvince(militaryProvinces, settledProvinceId)?.regionId ?? unit.regionId;
+      return { ...result.unit, status: "garrison" as const, provinceId: settledProvinceId, regionId: settledRegionId, destinationProvinceId: undefined, originProvinceId: undefined, arrivalAtMinute: undefined };
+    }
+
+    militaryEventLog.push({
+      id: `arrive-${unit.id}-${newMilitaryElapsedMinutes}`,
+      atMinute: newMilitaryElapsedMinutes,
+      text: `${unit.name}が${destination?.name ?? destinationId}に到着した。`,
+    });
+    return { ...unit, status: "garrison" as const, provinceId: destinationId, regionId: destination?.regionId ?? unit.regionId, destinationProvinceId: undefined, originProvinceId: undefined, arrivalAtMinute: undefined };
+  });
+
+  // 艦隊の移動——到着予定時刻に達したら、その海域へ配置する（HOI4型改訂・指示書6章）。
+  const militaryFleets = military.fleets.map((fleet) => {
+    if (fleet.status !== "moving" || fleet.arrivalAtMinute === undefined || fleet.arrivalAtMinute > newMilitaryElapsedMinutes) return fleet;
+    const destinationId = fleet.destinationProvinceId!;
+    const destination = findProvince(militaryProvinces, destinationId);
+    militaryEventLog.push({
+      id: `fleet-arrive-${fleet.id}-${newMilitaryElapsedMinutes}`,
+      atMinute: newMilitaryElapsedMinutes,
+      text: `${fleet.name}が${destination?.name ?? destinationId}に到着した。`,
+    });
+    return { ...fleet, status: "garrison" as const, provinceId: destinationId, regionId: destination?.regionId ?? fleet.regionId, destinationProvinceId: undefined, arrivalAtMinute: undefined };
   });
 
   // 生産ライン——工場×効率×予算比率で累積し、1単位ぶん貯まるたびに能力指数へ少しずつ還元する（指示書16章）。
@@ -373,6 +427,7 @@ function tick(state: GameState): GameState {
       frontStatus[frontRegion] = "active";
       for (const neighbor of REGION_ADJACENCY[frontRegion]) frontStatus[neighbor] = "tense";
       militaryWar = { enemyCountryId: attackerId, startedAtMinute: newMilitaryElapsedMinutes, frontStatus };
+      militaryProvinces = markFrontProvincesContested(militaryProvinces, frontRegion);
       newMilitaryNotices.push({ kind: "armed_attack", enemyCountryId: attackerId });
       militaryEventLog.push({ id: `armed-attack-${newMilitaryElapsedMinutes}`, atMinute: newMilitaryElapsedMinutes, text: `${attackerId}による武力攻撃を確認した。`, confidence: "high" });
       shouldPause = true;
@@ -490,7 +545,9 @@ function tick(state: GameState): GameState {
     ...military,
     forces: militaryForces,
     personnel: militaryPersonnel,
+    provinces: militaryProvinces,
     units: militaryUnits,
+    fleets: militaryFleets,
     productionLines: militaryProductionLines,
     intel: militaryIntel,
     war: militaryWar,
@@ -876,16 +933,49 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       };
     }
 
-    case "MOVE_UNIT": {
+    case "MOVE_UNITS": {
+      if (state.phase !== "playing") return state;
+      const military = state.military;
+      const destination = findProvince(military.provinces, action.destinationProvinceId);
+      if (!destination || destination.kind !== "land") return state;
+      let changed = false;
+      const units = military.units.map((unit) => {
+        if (!action.unitIds.includes(unit.id) || unit.status !== "garrison" || unit.provinceId === action.destinationProvinceId) return unit;
+        const days = provinceTravelDays(military.provinces, unit.provinceId, action.destinationProvinceId);
+        changed = true;
+        return {
+          ...unit,
+          status: "moving" as const,
+          destinationProvinceId: action.destinationProvinceId,
+          originProvinceId: unit.provinceId,
+          arrivalAtMinute: military.elapsedMinutes + days * MILITARY_MINUTES_PER_DAY,
+          order: undefined,
+        };
+      });
+      if (!changed) return state;
+      return { ...state, military: { ...military, units } };
+    }
+
+    case "SET_UNIT_ORDER": {
       if (state.phase !== "playing") return state;
       const military = state.military;
       const unit = military.units.find((u) => u.id === action.unitId);
-      if (!unit || unit.status !== "garrison" || unit.regionId === action.destinationRegionId) return state;
-      const days = travelDays(unit.regionId, action.destinationRegionId);
-      const units = military.units.map((u) =>
-        u.id === unit.id ? { ...u, status: "moving" as const, destinationRegionId: action.destinationRegionId, arrivalAtMinute: military.elapsedMinutes + days * MILITARY_MINUTES_PER_DAY } : u,
-      );
+      if (!unit || unit.status !== "garrison") return state;
+      const units = military.units.map((u) => (u.id === action.unitId ? { ...u, order: action.order ?? undefined } : u));
       return { ...state, military: { ...military, units } };
+    }
+
+    case "MOVE_FLEET": {
+      if (state.phase !== "playing") return state;
+      const military = state.military;
+      const fleet = military.fleets.find((f) => f.id === action.fleetId);
+      const destination = findProvince(military.provinces, action.destinationProvinceId);
+      if (!fleet || !destination || destination.kind !== "sea" || fleet.status !== "garrison" || fleet.provinceId === action.destinationProvinceId) return state;
+      const days = provinceTravelDays(military.provinces, fleet.provinceId, action.destinationProvinceId);
+      const fleets = military.fleets.map((f) =>
+        f.id === fleet.id ? { ...f, status: "moving" as const, destinationProvinceId: action.destinationProvinceId, arrivalAtMinute: military.elapsedMinutes + days * MILITARY_MINUTES_PER_DAY } : f,
+      );
+      return { ...state, military: { ...military, fleets } };
     }
 
     case "SET_FLEET_MISSION": {
@@ -899,6 +989,15 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (state.phase !== "playing") return state;
       const military = state.military;
       const airWings = military.airWings.map((wing) => (wing.id === action.airWingId ? { ...wing, mission: action.mission } : wing));
+      return { ...state, military: { ...military, airWings } };
+    }
+
+    case "SET_AIRWING_TARGET": {
+      if (state.phase !== "playing") return state;
+      const military = state.military;
+      const wing = military.airWings.find((w) => w.id === action.airWingId);
+      if (!wing || !wing.coverageRegionIds.includes(action.targetRegionId)) return state;
+      const airWings = military.airWings.map((w) => (w.id === wing.id ? { ...w, targetRegionId: action.targetRegionId } : w));
       return { ...state, military: { ...military, airWings } };
     }
 

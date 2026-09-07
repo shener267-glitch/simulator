@@ -81,8 +81,10 @@ export type ConscriptionPolicyId = "volunteer" | "draft" | "reserve_expansion";
 
 export type UnitBranch = "gsdf" | "msdf" | "asdf" | "joint";
 export type UnitStatus = "garrison" | "moving" | "deployed";
+/** 防御命令（HOI4型改訂・指示書4章）。攻撃・待機・撤退・再配置は既存のMOVE_UNITS／不作為で表現し、これだけ状態として持つ。 */
+export type UnitOrder = "defend";
 
-/** 日本周辺の軍事的な地理区分12件（指示書5章）。 */
+/** 日本周辺の軍事的な地理区分12件（指示書5章）。プロヴィンス導入後もこの粒度の集計・前線表示に使い続ける。 */
 export type MilitaryRegionId =
   | "hokkaido"
   | "tohoku"
@@ -104,6 +106,43 @@ export interface Base {
   name: string;
   kind: BaseKind;
   regionId: MilitaryRegionId;
+  /** 所在プロヴィンス（HOI4型改訂）。 */
+  provinceId: string;
+}
+
+/** 地形（HOI4型改訂・指示書2章）。戦闘計算・移動速度に影響する。 */
+export type TerrainType = "plains" | "mountains" | "forest" | "urban" | "coastal" | "sea";
+
+/**
+ * プロヴィンス——作戦地図をさらに細かく分割した区画（HOI4型改訂・指示書2章）。
+ * `regionId`で既存の12地域区分（前線表示・集計）とも紐づける。海のプロヴィンス
+ * は`kind:"sea"`、艦隊はここへ配置する。
+ */
+export interface Province {
+  id: string;
+  name: string;
+  regionId: MilitaryRegionId;
+  kind: "land" | "sea";
+  terrain: TerrainType;
+  /** 所有国。他国の実在の領有権を主張するものではなく、Phase 5改訂ではJPNのみ実データを持つ。 */
+  ownerCountryId: string;
+  /** 0〜10。移動速度・補給に影響する簡略化した指数。 */
+  infrastructureLevel: number;
+  /** 0〜100。補給の届きやすさの簡略化した指数。 */
+  supplyLevel: number;
+  hasCity: boolean;
+  hasPort: boolean;
+  baseId?: string;
+  /** 0〜10。防御施設の充実度、防御側の戦闘計算に加算する。 */
+  fortificationLevel: number;
+  /**
+   * 戦争中、前線として係争状態にあるか（指示書4・5章）。他国の実在の領有権を
+   * 動かすものではなく、あくまでゲーム上の「ここが前線になっている」という
+   * 一時的なフラグ——味方プロヴィンスに立つこともある。
+   */
+  contested: boolean;
+  /** 簡略化した地図上の座標（実在の地理座標ではない、指示書4章のスケッチに沿う）。 */
+  position: { x: number; y: number };
 }
 
 export interface Unit {
@@ -115,13 +154,18 @@ export interface Unit {
   moralePercent: number;
   baseId: string;
   regionId: MilitaryRegionId;
+  /** 所在プロヴィンス（HOI4型改訂）。移動・戦闘はこちらの粒度で行う。 */
+  provinceId: string;
   status: UnitStatus;
+  order?: UnitOrder;
   /** 移動中のみ。到着予定の絶対分。 */
-  destinationRegionId?: MilitaryRegionId;
+  destinationProvinceId?: string;
   arrivalAtMinute?: number;
+  /** 移動元。撤退・戦闘敗北時に戻る先。 */
+  originProvinceId?: string;
 }
 
-export type FleetMission = "patrol" | "escort" | "transport" | "blockade" | "asw";
+export type FleetMission = "patrol" | "escort" | "transport" | "blockade" | "asw" | "attack" | "standby" | "return_to_port";
 
 export interface Fleet {
   id: string;
@@ -131,10 +175,15 @@ export interface Fleet {
   supplyShips: number;
   baseId: string;
   regionId: MilitaryRegionId;
+  /** 所在プロヴィンス（海のプロヴィンス、HOI4型改訂）。 */
+  provinceId: string;
   mission: FleetMission;
+  status: UnitStatus;
+  destinationProvinceId?: string;
+  arrivalAtMinute?: number;
 }
 
-export type AirWingMission = "air_defense" | "intercept" | "air_superiority";
+export type AirWingMission = "air_defense" | "intercept" | "air_superiority" | "anti_ship" | "close_air_support" | "reconnaissance";
 
 export interface AirWing {
   id: string;
@@ -142,9 +191,11 @@ export interface AirWing {
   fighters: number;
   supportAircraft: number;
   baseId: string;
-  /** 航続圏内としてカバーする地域（指示書9章）。 */
+  /** 航続圏内としてカバーする地域（指示書9章、機体の航続距離から決まる範囲）。 */
   coverageRegionIds: MilitaryRegionId[];
   mission: AirWingMission;
+  /** プレイヤーが指定する作戦地域（HOI4型改訂・指示書7章）。coverageRegionIds内のみ指定できる。 */
+  targetRegionId?: MilitaryRegionId;
 }
 
 export type ProductionItemId = "fighter" | "destroyer" | "tank" | "missile";
@@ -228,6 +279,7 @@ export interface MilitaryState {
   readiness: ReadinessLevel;
   mobilization: MobilizationState;
   conscriptionPolicy: ConscriptionPolicyId;
+  provinces: Province[];
   bases: Base[];
   units: Unit[];
   fleets: Fleet[];

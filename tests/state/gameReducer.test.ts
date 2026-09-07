@@ -3,6 +3,7 @@ import { createInitialState } from "../../src/state/initialState";
 import { gameReducer } from "../../src/state/gameReducer";
 import { DEFAULT_COUNTRY_ID } from "../../src/data/countries";
 import { computeRelation } from "../../src/engine/diplomacy";
+import { markFrontProvincesContested, provinceTravelDays } from "../../src/engine/military";
 import type { GameState } from "../../src/types/game";
 
 describe("the title → select → playing flow", () => {
@@ -664,38 +665,144 @@ describe("conscription policy (指示書13章)", () => {
   });
 });
 
-describe("unit movement (指示書7章)", () => {
-  it("sends a garrisoned unit moving, with an arrival time derived from travel days", () => {
+describe("direct unit movement (HOI4型改訂・指示書1・3章)", () => {
+  it("sends a garrisoned unit moving to an adjacent province, with an arrival time derived from province travel days", () => {
     const state = playing();
-    const next = gameReducer(state, { type: "MOVE_UNIT", unitId: "div1", destinationRegionId: "tohoku" }); // kanto→tohoku、隣接1区間
+    const next = gameReducer(state, { type: "MOVE_UNITS", unitIds: ["div1"], destinationProvinceId: "tohoku-rural" }); // tokyo-metro→tohoku-rural、隣接1区間
     const unit = next.military.units.find((u) => u.id === "div1")!;
+    const expectedDays = provinceTravelDays(state.military.provinces, "tokyo-metro", "tohoku-rural");
     expect(unit.status).toBe("moving");
-    expect(unit.destinationRegionId).toBe("tohoku");
-    expect(unit.arrivalAtMinute).toBeCloseTo(1.5 * 1440);
+    expect(unit.destinationProvinceId).toBe("tohoku-rural");
+    expect(unit.originProvinceId).toBe("tokyo-metro");
+    expect(unit.arrivalAtMinute).toBeCloseTo(expectedDays * 1440);
+  });
+
+  it("moves several selected divisions to the same province at once", () => {
+    const state = playing();
+    const next = gameReducer(state, { type: "MOVE_UNITS", unitIds: ["div1", "div6"], destinationProvinceId: "tohoku-rural" });
+    expect(next.military.units.find((u) => u.id === "div1")?.status).toBe("moving");
+    expect(next.military.units.find((u) => u.id === "div6")?.status).toBe("moving");
   });
 
   it("refuses to move a unit that is already moving", () => {
     let state = playing();
-    state = gameReducer(state, { type: "MOVE_UNIT", unitId: "div1", destinationRegionId: "tohoku" });
-    const next = gameReducer(state, { type: "MOVE_UNIT", unitId: "div1", destinationRegionId: "kyushu" });
+    state = gameReducer(state, { type: "MOVE_UNITS", unitIds: ["div1"], destinationProvinceId: "tohoku-rural" });
+    const next = gameReducer(state, { type: "MOVE_UNITS", unitIds: ["div1"], destinationProvinceId: "kumamoto-province" });
     expect(next).toBe(state);
   });
 
-  it("resolves the move once the arrival minute has passed, on TICK", () => {
+  it("resolves the move once the arrival minute has passed, on TICK, when the destination is uncontested", () => {
     let state = playing();
     state = {
       ...state,
       military: {
         ...state.military,
-        units: state.military.units.map((u) => (u.id === "div1" ? { ...u, status: "moving", destinationRegionId: "tohoku", arrivalAtMinute: 1 } : u)),
+        units: state.military.units.map((u) => (u.id === "div1" ? { ...u, status: "moving", destinationProvinceId: "tohoku-rural", originProvinceId: "tokyo-metro", arrivalAtMinute: 1 } : u)),
       },
     };
     state = gameReducer(state, { type: "SET_SPEED", speed: 8 });
     const next = gameReducer(state, { type: "TICK" });
     const unit = next.military.units.find((u) => u.id === "div1")!;
     expect(unit.status).toBe("garrison");
+    expect(unit.provinceId).toBe("tohoku-rural");
     expect(unit.regionId).toBe("tohoku");
-    expect(unit.destinationRegionId).toBeUndefined();
+    expect(unit.destinationProvinceId).toBeUndefined();
+  });
+
+  it("resolves combat on arrival at a contested province, and clears the flag on victory", () => {
+    let state = playing();
+    state = {
+      ...state,
+      military: {
+        ...state.military,
+        provinces: state.military.provinces.map((p) => (p.id === "tohoku-rural" ? { ...p, contested: true } : p)),
+        units: state.military.units.map((u) => (u.id === "div1" ? { ...u, status: "moving", destinationProvinceId: "tohoku-rural", originProvinceId: "tokyo-metro", arrivalAtMinute: 1 } : u)),
+      },
+    };
+    state = gameReducer(state, { type: "SET_SPEED", speed: 8 });
+    const next = gameReducer(state, { type: "TICK" });
+    const unit = next.military.units.find((u) => u.id === "div1")!;
+    expect(unit.status).toBe("garrison");
+    // 攻撃側は第1師団（充足度が高い）、防御側は関係値の目安（デフォルト0）——高確率で勝利するはずだが、
+    // 乱数のブレを踏まえて「駐屯地扱いに戻ったこと」と「戦闘ログが残ること」だけを厳密に確かめる。
+    expect(["tohoku-rural", "tokyo-metro"]).toContain(unit.provinceId);
+    expect(next.military.eventLog.some((entry) => entry.text.includes("交戦"))).toBe(true);
+  });
+
+  it("gives a defending garrisoned unit a small morale regen over time", () => {
+    let state = playing();
+    state = gameReducer(state, { type: "SET_UNIT_ORDER", unitId: "div1", order: "defend" });
+    const before = state.military.units.find((u) => u.id === "div1")!.moralePercent;
+    state = gameReducer(state, { type: "SET_SPEED", speed: 8 });
+    const next = gameReducer(state, { type: "TICK" });
+    expect(next.military.units.find((u) => u.id === "div1")!.moralePercent).toBeGreaterThan(before);
+  });
+
+  it("clears the defend order once the unit is given a move order", () => {
+    let state = playing();
+    state = gameReducer(state, { type: "SET_UNIT_ORDER", unitId: "div1", order: "defend" });
+    state = gameReducer(state, { type: "MOVE_UNITS", unitIds: ["div1"], destinationProvinceId: "tohoku-rural" });
+    expect(state.military.units.find((u) => u.id === "div1")?.order).toBeUndefined();
+  });
+});
+
+describe("fleet movement (HOI4型改訂・指示書6章)", () => {
+  it("sends a garrisoned fleet moving to a sea province", () => {
+    const state = playing();
+    const next = gameReducer(state, { type: "MOVE_FLEET", fleetId: "escort-flotilla-1", destinationProvinceId: "sea-of-japan-zone" });
+    const fleet = next.military.fleets.find((f) => f.id === "escort-flotilla-1")!;
+    expect(fleet.status).toBe("moving");
+    expect(fleet.destinationProvinceId).toBe("sea-of-japan-zone");
+  });
+
+  it("refuses to move a fleet onto a land province", () => {
+    const state = playing();
+    const next = gameReducer(state, { type: "MOVE_FLEET", fleetId: "escort-flotilla-1", destinationProvinceId: "tokyo-metro" });
+    expect(next).toBe(state);
+  });
+
+  it("resolves the fleet's move once the arrival minute has passed, on TICK", () => {
+    let state = playing();
+    state = {
+      ...state,
+      military: {
+        ...state.military,
+        fleets: state.military.fleets.map((f) => (f.id === "escort-flotilla-1" ? { ...f, status: "moving", destinationProvinceId: "sea-of-japan-zone", arrivalAtMinute: 1 } : f)),
+      },
+    };
+    state = gameReducer(state, { type: "SET_SPEED", speed: 8 });
+    const next = gameReducer(state, { type: "TICK" });
+    const fleet = next.military.fleets.find((f) => f.id === "escort-flotilla-1")!;
+    expect(fleet.status).toBe("garrison");
+    expect(fleet.provinceId).toBe("sea-of-japan-zone");
+  });
+});
+
+describe("air wing target area (HOI4型改訂・指示書7章)", () => {
+  it("sets a target region within the wing's coverage", () => {
+    const state = playing();
+    const next = gameReducer(state, { type: "SET_AIRWING_TARGET", airWingId: "chitose-wing", targetRegionId: "hokkaido" });
+    expect(next.military.airWings.find((w) => w.id === "chitose-wing")?.targetRegionId).toBe("hokkaido");
+  });
+
+  it("refuses a target region outside the wing's coverage", () => {
+    const state = playing();
+    const next = gameReducer(state, { type: "SET_AIRWING_TARGET", airWingId: "chitose-wing", targetRegionId: "kyushu" });
+    expect(next).toBe(state);
+  });
+});
+
+describe("war entry marks front-region provinces contested (HOI4型改訂・指示書4・5章)", () => {
+  it("marks provinces in the attacked region as contested when the armed-attack notice fires", () => {
+    let state = playing();
+    state = { ...state, diplomacy: { ...state.diplomacy, relations: { ...state.diplomacy.relations, RUS: { ...state.diplomacy.relations.RUS, baseRelation: -90, modifiers: [] } } } };
+    state = gameReducer(state, { type: "SET_SPEED", speed: 8 });
+    // 発火確率は低いので、決定論的に確かめるにはmarkFrontProvincesContestedそのものを直接使う。
+    const marked = markFrontProvincesContested(state.military.provinces, "sea_of_japan");
+    const seaOfJapanProvince = marked.find((p) => p.regionId === "sea_of_japan");
+    expect(seaOfJapanProvince?.contested).toBe(true);
+    const untouched = marked.find((p) => p.regionId === "kanto");
+    expect(untouched?.contested).toBe(false);
   });
 });
 

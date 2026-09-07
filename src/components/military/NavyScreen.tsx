@@ -1,19 +1,31 @@
 import { useState } from "react";
 import { Panel } from "../shared/Panel";
 import { Modal } from "../shared/Modal";
-import { MILITARY_REGION_LABELS } from "../../data/military";
+import { findProvince } from "../../data/military";
+import { provinceTravelDays } from "../../engine/military";
 import type { FleetMission } from "../../types/military";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
 
-const MISSION_LABELS: Record<FleetMission, string> = { patrol: "哨戒", escort: "護衛", transport: "輸送", blockade: "海上封鎖", asw: "対潜作戦" };
+const MISSION_LABELS: Record<FleetMission, string> = {
+  patrol: "哨戒",
+  escort: "護衛",
+  transport: "輸送",
+  blockade: "海上封鎖",
+  asw: "対潜作戦",
+  attack: "攻撃",
+  standby: "待機",
+  return_to_port: "港へ帰還",
+};
 
-/** 海軍画面（指示書8章）。艦艇を艦隊として編成し、任務を設定する。 */
+/** 海軍画面（指示書6・8章、HOI4型改訂）。艦隊を海域プロヴィンスへ直接移動させ、任務を設定する。 */
 export function NavyScreen({ onClose }: { onClose: () => void }) {
   const state = useGameState();
   const dispatch = useGameDispatch();
   const [openFleetId, setOpenFleetId] = useState<string | null>(null);
-  const { fleets, bases } = state.military;
+  const [movePickerOpen, setMovePickerOpen] = useState(false);
+  const { fleets, bases, provinces } = state.military;
   const openFleet = fleets.find((f) => f.id === openFleetId);
+  const seaProvinces = provinces.filter((p) => p.kind === "sea");
 
   return (
     <Panel title="🚢 海軍" onClose={onClose}>
@@ -23,6 +35,7 @@ export function NavyScreen({ onClose }: { onClose: () => void }) {
         ) : (
           fleets.map((fleet) => {
             const base = bases.find((b) => b.id === fleet.baseId);
+            const location = findProvince(provinces, fleet.provinceId);
             return (
               <button
                 key={fleet.id}
@@ -37,7 +50,9 @@ export function NavyScreen({ onClose }: { onClose: () => void }) {
                   {fleet.supplyShips > 0 && `⛽補給艦×${fleet.supplyShips}`}
                 </p>
                 <p className="text-[0.78rem] text-body-muted">
-                  所在地：{base?.name ?? MILITARY_REGION_LABELS[fleet.regionId]} ・ 任務：{MISSION_LABELS[fleet.mission]}
+                  {base ? `${base.name}所属 ・ ` : ""}
+                  所在：{location?.name ?? fleet.regionId} ・ 任務：{MISSION_LABELS[fleet.mission]}
+                  {fleet.status === "moving" && "（移動中→）"}
                 </p>
               </button>
             );
@@ -48,7 +63,18 @@ export function NavyScreen({ onClose }: { onClose: () => void }) {
       {openFleet && (
         <Modal title={openFleet.name} onClose={() => setOpenFleetId(null)}>
           <div className="flex flex-col gap-4">
-            <p className="text-[0.85rem] text-body-muted">所在地：{bases.find((b) => b.id === openFleet.baseId)?.name ?? MILITARY_REGION_LABELS[openFleet.regionId]}</p>
+            <p className="text-[0.85rem] text-body-muted">所在：{findProvince(provinces, openFleet.provinceId)?.name ?? openFleet.regionId}</p>
+
+            {openFleet.status === "garrison" && (
+              <button
+                type="button"
+                onClick={() => setMovePickerOpen(true)}
+                className="min-h-[48px] rounded border border-brass/60 bg-brass/10 text-[0.9rem] font-medium text-brass transition-colors hover:bg-brass/20"
+              >
+                移動を指示する
+              </button>
+            )}
+
             <div>
               <p className="mb-2 text-[0.75rem] font-medium tracking-wider text-brass">任務</p>
               <div className="flex flex-col gap-1.5">
@@ -67,6 +93,30 @@ export function NavyScreen({ onClose }: { onClose: () => void }) {
               </div>
             </div>
           </div>
+
+          {movePickerOpen && (
+            <Modal title="移動先の海域を選ぶ" onClose={() => setMovePickerOpen(false)}>
+              <div className="flex flex-col gap-1.5">
+                {seaProvinces
+                  .filter((p) => p.id !== openFleet.provinceId)
+                  .map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        dispatch({ type: "MOVE_FLEET", fleetId: openFleet.id, destinationProvinceId: p.id });
+                        setMovePickerOpen(false);
+                        setOpenFleetId(null);
+                      }}
+                      className="flex min-h-[48px] items-center justify-between rounded-lg border border-line bg-ink-panel px-3.5 text-left text-[0.88rem] text-body transition-colors hover:border-brass/40"
+                    >
+                      <span>{p.name}</span>
+                      <span className="figures text-[0.75rem] text-body-muted">約{provinceTravelDays(provinces, openFleet.provinceId, p.id)}日</span>
+                    </button>
+                  ))}
+              </div>
+            </Modal>
+          )}
         </Modal>
       )}
     </Panel>

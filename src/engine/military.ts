@@ -7,11 +7,14 @@ import type {
   MobilizationState,
   PersonnelStats,
   ProductionLine,
+  Province,
   ReadinessLevel,
+  TerrainType,
+  Unit,
   WarState,
   FrontStatus,
 } from "../types/military";
-import { MILITARY_EVENTS, MILITARY_REGION_LABELS, PRODUCTION_CAPABILITY_PER_UNIT, PRODUCTION_UNIT_COST, REGION_ADJACENCY } from "../data/military";
+import { MILITARY_EVENTS, MILITARY_REGION_LABELS, PRODUCTION_CAPABILITY_PER_UNIT, PRODUCTION_UNIT_COST, PROVINCE_ADJACENCY, REGION_ADJACENCY, findProvince } from "../data/military";
 
 /** 日本周辺の軍事区分12件のid一覧（`MILITARY_REGION_LABELS`のキーから導く）。 */
 export const MILITARY_REGION_IDS = Object.keys(MILITARY_REGION_LABELS) as MilitaryRegionId[];
@@ -154,17 +157,17 @@ export function applyMilitaryEffects(effects: MilitaryEffect[], forces: ForceSta
   return { forces: nextForces, personnel: nextPersonnel, politicalPowerDelta, governmentSupportDelta, relationDeltas, triggeredEventIds };
 }
 
-/** 隣接地域をたどった最短経路の区間数。移動時間の計算に使う（指示書7章）。 */
-export function regionHopDistance(from: MilitaryRegionId, to: MilitaryRegionId): number {
+/** 隣接関係をたどった最短経路の区間数。地域・プロヴィンスどちらの隣接表にも使える共通のBFS。 */
+function hopDistance(adjacency: Record<string, string[]>, from: string, to: string): number {
   if (from === to) return 0;
-  const visited = new Set<MilitaryRegionId>([from]);
-  let frontier: MilitaryRegionId[] = [from];
+  const visited = new Set<string>([from]);
+  let frontier: string[] = [from];
   let hops = 0;
   while (frontier.length > 0) {
     hops += 1;
-    const next: MilitaryRegionId[] = [];
-    for (const region of frontier) {
-      for (const neighbor of REGION_ADJACENCY[region]) {
+    const next: string[] = [];
+    for (const node of frontier) {
+      for (const neighbor of adjacency[node] ?? []) {
         if (neighbor === to) return hops;
         if (!visited.has(neighbor)) {
           visited.add(neighbor);
@@ -177,14 +180,98 @@ export function regionHopDistance(from: MilitaryRegionId, to: MilitaryRegionId):
   return hops;
 }
 
+/** 隣接地域をたどった最短経路の区間数。地域単位の集計・前線表示に使う（指示書5章）。 */
+export function regionHopDistance(from: MilitaryRegionId, to: MilitaryRegionId): number {
+  return hopDistance(REGION_ADJACENCY, from, to);
+}
+
 /**
- * 部隊移動の所要日数（指示書7章）。実際の道路・鉄道・港湾を個別に
- * モデル化はせず、地域間の区間数から一律の目安を出す簡略化
- * 【ゲーム上の設定】。
+ * 地域単位の移動所要日数の目安（指示書5章の集計向け、プロヴィンス導入前の互換用）。
+ * 部隊そのものの移動は`provinceTravelDays`のプロヴィンス粒度で行う。
  */
 export function travelDays(from: MilitaryRegionId, to: MilitaryRegionId): number {
   const hops = regionHopDistance(from, to);
   return Math.max(0.5, hops * 1.5);
+}
+
+/** プロヴィンス間の最短経路の区間数（HOI4型改訂・指示書3章）。 */
+export function provinceHopDistance(from: string, to: string): number {
+  return hopDistance(PROVINCE_ADJACENCY, from, to);
+}
+
+/**
+ * 部隊移動の所要日数（HOI4型改訂・指示書3章）。区間数に加えて、出発・到着
+ * 両プロヴィンスのインフラ整備度から速度を補正する——インフラが高いほど
+ * 短くなる、実際の道路・鉄道網の個別モデル化はしない簡略化
+ * 【ゲーム上の設定】。
+ */
+export function provinceTravelDays(provinces: Province[], from: string, to: string): number {
+  const hops = provinceHopDistance(from, to);
+  if (hops === 0) return 0.25;
+  const fromProvince = findProvince(provinces, from);
+  const toProvince = findProvince(provinces, to);
+  const avgInfra = ((fromProvince?.infrastructureLevel ?? 0) + (toProvince?.infrastructureLevel ?? 0)) / 2;
+  const speedFactor = 1 / (1 + avgInfra / 10);
+  return Math.max(0.25, hops * 1.2 * speedFactor);
+}
+
+/** 地形ごとの防御側ボーナス（HOI4型改訂・指示書4章の簡略化）。 */
+const TERRAIN_DEFENSE_BONUS: Record<TerrainType, number> = {
+  plains: 0,
+  coastal: 0.05,
+  forest: 0.15,
+  mountains: 0.25,
+  urban: 0.2,
+  sea: 0,
+};
+
+export interface LandCombatResult {
+  outcome: "victory" | "defeat" | "stalemate";
+  unit: Unit;
+  /** 勝利すれば、そのプロヴィンスの係争状態を解消する。 */
+  provinceSecured: boolean;
+}
+
+/**
+ * 簡略化した陸上戦闘（HOI4型改訂・指示書4章）。攻撃側（移動を命じた部隊）の
+ * 人員充足・装備充足・士気と、防御側の目安戦力（情報スナップショットの
+ * 推定値）・地形・要塞化度から勝敗を出し、部隊の人員・装備・士気を減らす
+ * ——HOI4本家のような詳細な戦闘幅・組織率の計算はしない。
+ */
+export function resolveLandCombat(unit: Unit, province: Province, enemyLandEstimate: number, random: () => number): LandCombatResult {
+  const attackerStrength = (unit.personnel.current / unit.personnel.max) * (unit.equipmentRatePercent / 100) * (unit.moralePercent / 100) * 100;
+  const defenderStrength = Math.max(5, enemyLandEstimate) * (1 + province.fortificationLevel * 0.08 + TERRAIN_DEFENSE_BONUS[province.terrain]);
+  const margin = attackerStrength - defenderStrength + (random() - 0.5) * 20;
+
+  let outcome: LandCombatResult["outcome"];
+  let personnelLossRate: number;
+  let equipmentLossRate: number;
+  let moraleLossRate: number;
+  if (margin > 15) {
+    outcome = "victory";
+    personnelLossRate = 0.03;
+    equipmentLossRate = 0.03;
+    moraleLossRate = 0.02;
+  } else if (margin < -15) {
+    outcome = "defeat";
+    personnelLossRate = 0.1;
+    equipmentLossRate = 0.12;
+    moraleLossRate = 0.15;
+  } else {
+    outcome = "stalemate";
+    personnelLossRate = 0.05;
+    equipmentLossRate = 0.05;
+    moraleLossRate = 0.05;
+  }
+
+  const nextUnit: Unit = {
+    ...unit,
+    personnel: { ...unit.personnel, current: Math.max(0, Math.round(unit.personnel.current * (1 - personnelLossRate))) },
+    equipmentRatePercent: Math.max(0, Math.round(unit.equipmentRatePercent * (1 - equipmentLossRate))),
+    moralePercent: Math.max(0, Math.round(unit.moralePercent * (1 - moraleLossRate))),
+  };
+
+  return { outcome, unit: nextUnit, provinceSecured: outcome === "victory" };
 }
 
 /**
@@ -275,6 +362,11 @@ export function rollArmedAttack(relationByCountry: Record<string, number>, elaps
   if (hostile.length === 0) return null;
   if (random() >= 0.005 * elapsedDays) return null;
   return hostile[Math.floor(random() * hostile.length)][0];
+}
+
+/** 武力攻撃を受けた地域のプロヴィンスを、前線として係争状態にする（HOI4型改訂・指示書4・5章）。 */
+export function markFrontProvincesContested(provinces: Province[], frontRegionId: MilitaryRegionId): Province[] {
+  return provinces.map((province) => (province.regionId === frontRegionId ? { ...province, contested: true } : province));
 }
 
 const FRONT_ORDER: FrontStatus[] = ["calm", "tense", "active"];
