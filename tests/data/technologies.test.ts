@@ -7,9 +7,9 @@ describe("the technology tree", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("covers all five categories from 指示書14章", () => {
+  it("covers all six categories (指示書14章の五つ+Phase 5の軍事研究)", () => {
     const categories = new Set(TECHNOLOGIES.map((t) => t.category));
-    expect(categories).toEqual(new Set(["basic_science", "computing_ai", "energy", "industry", "aerospace"]));
+    expect(categories).toEqual(new Set(["basic_science", "computing_ai", "energy", "industry", "aerospace", "military"]));
   });
 
   it("never points a prerequisite at a tech that doesn't exist", () => {

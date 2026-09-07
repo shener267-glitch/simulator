@@ -51,6 +51,8 @@ export interface TechEffectResult {
   modifiers: NationalModifier[];
   unlockedTechIds: string[];
   speedBonusDelta: number;
+  /** 軍事能力指数への変化。Phase 5、指示書19・30章の研究↔軍事の接続。 */
+  militaryCapabilityDeltas: { category: "land" | "sea" | "air" | "missile" | "other"; amount: number }[];
 }
 
 /**
@@ -67,6 +69,7 @@ export function applyTechEffects(
   let nextModifiers = modifiers;
   let nextUnlocked = unlockedTechIds;
   let speedBonusDelta = 0;
+  const militaryCapabilityDeltas: TechEffectResult["militaryCapabilityDeltas"] = [];
 
   for (const effect of effects) {
     switch (effect.type) {
@@ -82,10 +85,13 @@ export function applyTechEffects(
       case "unlock_tech":
         nextUnlocked = nextUnlocked.includes(effect.techId) ? nextUnlocked : [...nextUnlocked, effect.techId];
         break;
+      case "modify_military_capability":
+        militaryCapabilityDeltas.push({ category: effect.category, amount: effect.amount });
+        break;
     }
   }
 
-  return { politicalStats: nextStats, modifiers: nextModifiers, unlockedTechIds: nextUnlocked, speedBonusDelta };
+  return { politicalStats: nextStats, modifiers: nextModifiers, unlockedTechIds: nextUnlocked, speedBonusDelta, militaryCapabilityDeltas };
 }
 
 function signed(amount: number): string {
@@ -103,6 +109,10 @@ export function describeTechEffect(effect: TechEffect): string {
     case "unlock_tech": {
       const unlocked = findTech(effect.techId);
       return `「${unlocked?.name ?? effect.techId}」が選べるようになる`;
+    }
+    case "modify_military_capability": {
+      const label = { land: "陸上戦力", sea: "海上戦力", air: "航空戦力", missile: "ミサイル戦力", other: "その他戦力" }[effect.category];
+      return `${label} ${signed(effect.amount)}`;
     }
   }
 }

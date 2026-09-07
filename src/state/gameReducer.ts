@@ -3,6 +3,22 @@ import type { CategoryId, FocusNotice, GameState, PoliticsState } from "../types
 import type { ResearchProgress } from "../types/research";
 import type { Speed } from "../types/gameTime";
 import type { DiplomaticLogEntry, DiplomaticNotice, DiplomaticStanceId, DiplomacyEffect, DiplomacyState, PendingSummit, TreatyTypeId } from "../types/diplomacy";
+import type {
+  AllianceCooperationId,
+  ConscriptionPolicyId,
+  FleetMission,
+  AirWingMission,
+  FrontStatus,
+  MilitaryEffect,
+  MilitaryLogEntry,
+  MilitaryNotice,
+  MilitaryRegionId,
+  MilitaryState,
+  MobilizationState,
+  Operation,
+  OperationPriority,
+  ReadinessLevel,
+} from "../types/military";
 import { advanceOneMinute, minutesPerTick } from "../engine/gameTime";
 import { applyFocusEffects, isFocusAvailable, isFocusDone, minutesToDays } from "../engine/focus";
 import { advanceEconomy, applyEconomyEffects, politicalDriftPerDay, schedulePolicyEffects } from "../engine/economy";
@@ -25,14 +41,34 @@ import {
   scheduleActionEffects,
   sweepTreaties,
 } from "../engine/diplomacy";
+import {
+  MILITARY_REGION_IDS,
+  MINUTES_PER_DAY as MILITARY_MINUTES_PER_DAY,
+  MOBILIZATION_DAILY_DRAG,
+  MOBILIZATION_ORDER,
+  MOBILIZATION_POLITICAL_POWER_COST,
+  READINESS_DAILY_DRAG,
+  READINESS_ORDER,
+  READINESS_POLITICAL_POWER_COST,
+  advanceProduction,
+  applyMilitaryEffects,
+  bindMilitaryEffectsToCountry,
+  driftFrontStatus,
+  driftIntel,
+  rollArmedAttack,
+  rollMilitaryEvent,
+  travelDays,
+} from "../engine/military";
 import { findFocus } from "../data/focuses";
 import { findEconomyPolicy } from "../data/economyPolicies";
 import { findTech } from "../data/technologies";
 import { SUMMIT_PREP_DAYS, findDiplomaticAction, findDiplomaticCrisis, findTreaty } from "../data/diplomacy";
+import { FOREIGN_MILITARY_BASELINE, MILITARY_REGION_LABELS, REGION_ADJACENCY, findAllianceCooperation, findMilitaryEvent } from "../data/military";
 import { createPoliticsState } from "./politics";
 import { createEconomyState } from "./economy";
 import { createResearchState } from "./research";
 import { createDiplomacyState } from "./diplomacy";
+import { createMilitaryState } from "./military";
 
 export type GameAction =
   /** タイトル画面から国家選択画面へ。 */
@@ -76,7 +112,33 @@ export type GameAction =
   /** 一定以上の関係を持つ国を、陣営へ招く。 */
   | { type: "INVITE_TO_FACTION"; factionId: string; countryId: string }
   /** 世界地図の関係線オーバーレイの表示を切り替える（指示書24章、任意）。 */
-  | { type: "TOGGLE_MAP_OVERLAY" };
+  | { type: "TOGGLE_MAP_OVERLAY" }
+  /** 防衛態勢を変える（Phase 5指示書11章）。引き上げには政治力が要る。 */
+  | { type: "SET_READINESS"; level: ReadinessLevel }
+  /** 動員状態を変える（指示書12章）。 */
+  | { type: "SET_MOBILIZATION"; state: MobilizationState }
+  /** 徴募制度を変える（指示書13章）。政治システムと接続する。 */
+  | { type: "SET_CONSCRIPTION_POLICY"; policy: ConscriptionPolicyId }
+  /** 部隊を移動させる（指示書7章）。移動には時間がかかる。 */
+  | { type: "MOVE_UNIT"; unitId: string; destinationRegionId: MilitaryRegionId }
+  /** 艦隊の任務を変える（指示書8章）。 */
+  | { type: "SET_FLEET_MISSION"; fleetId: string; mission: FleetMission }
+  /** 航空団の任務を変える（指示書9章）。 */
+  | { type: "SET_AIRWING_MISSION"; airWingId: string; mission: AirWingMission }
+  /** 作戦を立ち上げる（指示書25・26章）。部隊の1マスずつの操作はしない。 */
+  | { type: "START_OPERATION"; name: string; objective: string; regionId: MilitaryRegionId; priority: OperationPriority; unitIds: string[]; fleetIds: string[]; airWingIds: string[] }
+  /** 作戦を終了する。 */
+  | { type: "END_OPERATION"; operationId: string }
+  /** 同盟国との軍事協力（指示書27章）。 */
+  | { type: "MILITARY_COOPERATION_ACTION"; countryId: string; cooperationId: AllianceCooperationId }
+  /** 平時の軍事イベントに対応する（指示書31・32章）。選択肢を持つものだけ。 */
+  | { type: "RESPOND_MILITARY_EVENT"; optionId: string }
+  /** 確認するだけの軍事通知を読み終える。 */
+  | { type: "ACK_MILITARY_NOTICE" }
+  /** 武力攻撃への対応を決める（指示書23章）。戦争そのものは通知が立った時点で始まっている。 */
+  | { type: "RESPOND_ARMED_ATTACK"; response: "defend" | "request_ally_support" | "issue_statement" | "diplomatic_talks" }
+  /** 生産ラインの工場数を変える（指示書16章：何をどれだけ生産するかを決める）。 */
+  | { type: "ADJUST_PRODUCTION_FACTORIES"; itemId: "fighter" | "destroyer" | "tank" | "missile"; delta: number };
 
 function clampPercent(value: number): number {
   return Math.min(100, Math.max(0, value));
@@ -227,6 +289,112 @@ function tick(state: GameState): GameState {
     },
   };
 
+  // --- 軍事（Phase 5指示書0〜39章） ---
+  const military = state.military;
+  const newMilitaryElapsedMinutes = military.elapsedMinutes + elapsedMinutes;
+  const dueMilitary = military.scheduledEffects.filter((effect) => effect.atMinute <= newMilitaryElapsedMinutes);
+  const stillPendingMilitary = military.scheduledEffects.filter((effect) => effect.atMinute > newMilitaryElapsedMinutes);
+  let militaryForces = military.forces;
+  let militaryPersonnel = military.personnel;
+  let politicalPowerFromMilitary = 0;
+  let governmentSupportFromMilitary = 0;
+  const newMilitaryNotices: MilitaryNotice[] = [];
+  const militaryEventLog: MilitaryLogEntry[] = [];
+
+  // 予定されていた段階の適用（武力攻撃への「防衛作戦」対応など、経済政策と同じ発想）。
+  for (const scheduled of dueMilitary) {
+    const result = applyMilitaryEffects(scheduled.effects, militaryForces, militaryPersonnel);
+    militaryForces = result.forces;
+    militaryPersonnel = result.personnel;
+    politicalPowerFromMilitary += result.politicalPowerDelta;
+    governmentSupportFromMilitary += result.governmentSupportDelta;
+  }
+
+  // 部隊の移動——到着予定時刻に達したら、駐屯地扱いに戻す（指示書7章）。
+  const militaryUnits = military.units.map((unit) => {
+    if (unit.status === "moving" && unit.arrivalAtMinute !== undefined && unit.arrivalAtMinute <= newMilitaryElapsedMinutes) {
+      const destination = unit.destinationRegionId!;
+      militaryEventLog.push({
+        id: `arrive-${unit.id}-${newMilitaryElapsedMinutes}`,
+        atMinute: newMilitaryElapsedMinutes,
+        text: `${unit.name}が${MILITARY_REGION_LABELS[destination]}に到着した。`,
+      });
+      return { ...unit, status: "garrison" as const, regionId: destination, destinationRegionId: undefined, arrivalAtMinute: undefined };
+    }
+    return unit;
+  });
+
+  // 生産ライン——工場×効率×予算比率で累積し、1単位ぶん貯まるたびに能力指数へ少しずつ還元する（指示書16章）。
+  const militaryProductionLines = military.productionLines.map((line) => {
+    const advanced = advanceProduction(line, elapsedDays, economy.budget.defense, research.speedBonusPercent);
+    for (const gain of advanced.capabilityGains) {
+      militaryForces = { ...militaryForces, [gain.category]: { ...militaryForces[gain.category], capability: Math.min(100, militaryForces[gain.category].capability + gain.amount) } };
+    }
+    return advanced.line;
+  });
+
+  // 各国の軍事情報のドリフト（指示書20・21章）。確度は必ず不確実。
+  const militaryIntel: MilitaryState["intel"] = {};
+  for (const [countryId, snapshot] of Object.entries(military.intel)) {
+    const baseline = FOREIGN_MILITARY_BASELINE[countryId] ?? { land: 0, sea: 0, air: 0 };
+    militaryIntel[countryId] = driftIntel(snapshot, baseline, elapsedDays, Math.random);
+  }
+
+  // 防衛態勢・動員による、経済・関係値へのごく緩やかな負担（指示書11・12章）。
+  const readinessDrag = READINESS_DAILY_DRAG[military.readiness];
+  const mobilizationDrag = MOBILIZATION_DAILY_DRAG[military.mobilization];
+  economy = {
+    ...economy,
+    stats: { ...economy.stats, gdpGrowthRate: economy.stats.gdpGrowthRate + (readinessDrag.gdpGrowthDelta + mobilizationDrag.gdpGrowthDelta) * elapsedDays },
+  };
+  militaryPersonnel = { ...militaryPersonnel, fillRatePercent: Math.min(100, militaryPersonnel.fillRatePercent + mobilizationDrag.fillRateDrift * elapsedDays) };
+  if (readinessDrag.relationDriftAll !== 0) {
+    diploRelations = applyStanceRelationDrift(diploRelations, { politicalPowerPerDayDelta: 0, relationDriftPerDay: readinessDrag.relationDriftAll, treatyPartnerDriftBonus: 0, exportCapacityPercent: 0 }, elapsedDays);
+  }
+
+  // 平時にも起き続ける軍事イベント（指示書31・32章）。たいていは軽い出来事。
+  const militaryEventId = rollMilitaryEvent(elapsedDays, Math.random);
+  if (militaryEventId) {
+    const template = findMilitaryEvent(militaryEventId);
+    newMilitaryNotices.push({ kind: "military_event", eventId: militaryEventId });
+    militaryEventLog.push({ id: `event-${militaryEventId}-${newMilitaryElapsedMinutes}`, atMinute: newMilitaryElapsedMinutes, text: template?.title ?? militaryEventId, confidence: "medium" });
+    shouldPause = true;
+  }
+
+  // 武力攻撃の発生判定（指示書23章）。すでに戦争状態なら発生させない。
+  let militaryWar = military.war;
+  if (!militaryWar) {
+    const relationByCountry: Record<string, number> = {};
+    for (const [countryId, country] of Object.entries(diploRelations)) relationByCountry[countryId] = computeRelation(country);
+    const attackerId = rollArmedAttack(relationByCountry, elapsedDays, Math.random);
+    if (attackerId) {
+      const frontRegion: MilitaryRegionId = attackerId === "RUS" ? "sea_of_japan" : attackerId === "CHN" ? "east_china_sea" : "pacific_ocean";
+      const frontStatus = Object.fromEntries(MILITARY_REGION_IDS.map((id) => [id, "calm"])) as Record<MilitaryRegionId, FrontStatus>;
+      frontStatus[frontRegion] = "active";
+      for (const neighbor of REGION_ADJACENCY[frontRegion]) frontStatus[neighbor] = "tense";
+      militaryWar = { enemyCountryId: attackerId, startedAtMinute: newMilitaryElapsedMinutes, frontStatus };
+      newMilitaryNotices.push({ kind: "armed_attack", enemyCountryId: attackerId });
+      militaryEventLog.push({ id: `armed-attack-${newMilitaryElapsedMinutes}`, atMinute: newMilitaryElapsedMinutes, text: `${attackerId}による武力攻撃を確認した。`, confidence: "high" });
+      shouldPause = true;
+    }
+  } else {
+    // 前線の状況ドリフト（指示書24・26章）。詳細な戦闘計算はしない——作戦を割り当てた方面ほど持ちこたえやすい。
+    const regionSupportScore: Partial<Record<MilitaryRegionId, number>> = {};
+    for (const operation of military.operations) {
+      regionSupportScore[operation.regionId] = (regionSupportScore[operation.regionId] ?? 0) + (operation.priority === "defense" ? 6 : 3);
+    }
+    militaryWar = driftFrontStatus(militaryWar, regionSupportScore, Math.random);
+  }
+
+  politics = {
+    ...politics,
+    stats: {
+      ...politics.stats,
+      politicalPower: Math.max(0, politics.stats.politicalPower + politicalPowerFromMilitary),
+      governmentSupport: clampPercent(politics.stats.governmentSupport + governmentSupportFromMilitary),
+    },
+  };
+
   // --- 国家方針の進行 ---
   if (politics.activeFocus) {
     const template = findFocus(politics.activeFocus.focusId);
@@ -291,6 +459,10 @@ function tick(state: GameState): GameState {
         speedBonusPercent += result.speedBonusDelta;
         completedTechIds = [...completedTechIds, template.id];
         newNotices.push({ kind: "tech_complete", techId: template.id });
+        // 研究↔軍事の接続（Phase 5指示書19・30章）。軍事研究の完了が、対応する能力指数を押し上げる。
+        for (const delta of result.militaryCapabilityDeltas) {
+          militaryForces = { ...militaryForces, [delta.category]: { ...militaryForces[delta.category], capability: Math.min(100, Math.max(0, militaryForces[delta.category].capability + delta.amount)) } };
+        }
         shouldPause = true;
       } else {
         stillActive.push(progress);
@@ -314,6 +486,20 @@ function tick(state: GameState): GameState {
     pendingNotices: [...diplomacy.pendingNotices, ...newDiploNotices],
   };
 
+  const nextMilitary: MilitaryState = {
+    ...military,
+    forces: militaryForces,
+    personnel: militaryPersonnel,
+    units: militaryUnits,
+    productionLines: militaryProductionLines,
+    intel: militaryIntel,
+    war: militaryWar,
+    scheduledEffects: stillPendingMilitary,
+    elapsedMinutes: newMilitaryElapsedMinutes,
+    eventLog: [...military.eventLog, ...militaryEventLog],
+    pendingNotices: [...military.pendingNotices, ...newMilitaryNotices],
+  };
+
   return {
     ...state,
     gameTime: shouldPause ? { ...time, speed: 0 } : time,
@@ -321,6 +507,7 @@ function tick(state: GameState): GameState {
     economy,
     research,
     diplomacy: nextDiplomacy,
+    military: nextMilitary,
   };
 }
 
@@ -342,6 +529,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             economy: createEconomyState(state.selectedCountryId),
             research: createResearchState(),
             diplomacy: createDiplomacyState(state.selectedCountryId, state.countries),
+            military: createMilitaryState(state.selectedCountryId, state.countries),
           }
         : state;
 
@@ -644,6 +832,244 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "TOGGLE_MAP_OVERLAY":
       return { ...state, diplomacy: { ...state.diplomacy, mapOverlayEnabled: !state.diplomacy.mapOverlayEnabled } };
+
+    case "SET_READINESS": {
+      if (state.phase !== "playing") return state;
+      const military = state.military;
+      if (action.level === military.readiness) return state;
+      const escalating = READINESS_ORDER.indexOf(action.level) > READINESS_ORDER.indexOf(military.readiness);
+      const cost = escalating ? READINESS_POLITICAL_POWER_COST[action.level] : 0;
+      if (state.politics.stats.politicalPower < cost) return state;
+      return {
+        ...state,
+        politics: { ...state.politics, stats: { ...state.politics.stats, politicalPower: state.politics.stats.politicalPower - cost } },
+        military: { ...military, readiness: action.level },
+      };
+    }
+
+    case "SET_MOBILIZATION": {
+      if (state.phase !== "playing") return state;
+      const military = state.military;
+      if (action.state === military.mobilization) return state;
+      const escalating = MOBILIZATION_ORDER.indexOf(action.state) > MOBILIZATION_ORDER.indexOf(military.mobilization);
+      const cost = escalating ? MOBILIZATION_POLITICAL_POWER_COST[action.state] : 0;
+      if (state.politics.stats.politicalPower < cost) return state;
+      return {
+        ...state,
+        politics: { ...state.politics, stats: { ...state.politics.stats, politicalPower: state.politics.stats.politicalPower - cost } },
+        military: { ...military, mobilization: action.state },
+      };
+    }
+
+    case "SET_CONSCRIPTION_POLICY": {
+      if (state.phase !== "playing") return state;
+      const military = state.military;
+      if (action.policy === military.conscriptionPolicy) return state;
+      const cost = 20;
+      if (state.politics.stats.politicalPower < cost) return state;
+      const personnelBump =
+        action.policy === "draft" ? { mobilizable: military.personnel.mobilizable + 50000 } : action.policy === "reserve_expansion" ? { reserve: military.personnel.reserve + 20000 } : {};
+      return {
+        ...state,
+        politics: { ...state.politics, stats: { ...state.politics.stats, politicalPower: state.politics.stats.politicalPower - cost } },
+        military: { ...military, conscriptionPolicy: action.policy, personnel: { ...military.personnel, ...personnelBump } },
+      };
+    }
+
+    case "MOVE_UNIT": {
+      if (state.phase !== "playing") return state;
+      const military = state.military;
+      const unit = military.units.find((u) => u.id === action.unitId);
+      if (!unit || unit.status !== "garrison" || unit.regionId === action.destinationRegionId) return state;
+      const days = travelDays(unit.regionId, action.destinationRegionId);
+      const units = military.units.map((u) =>
+        u.id === unit.id ? { ...u, status: "moving" as const, destinationRegionId: action.destinationRegionId, arrivalAtMinute: military.elapsedMinutes + days * MILITARY_MINUTES_PER_DAY } : u,
+      );
+      return { ...state, military: { ...military, units } };
+    }
+
+    case "SET_FLEET_MISSION": {
+      if (state.phase !== "playing") return state;
+      const military = state.military;
+      const fleets = military.fleets.map((fleet) => (fleet.id === action.fleetId ? { ...fleet, mission: action.mission } : fleet));
+      return { ...state, military: { ...military, fleets } };
+    }
+
+    case "SET_AIRWING_MISSION": {
+      if (state.phase !== "playing") return state;
+      const military = state.military;
+      const airWings = military.airWings.map((wing) => (wing.id === action.airWingId ? { ...wing, mission: action.mission } : wing));
+      return { ...state, military: { ...military, airWings } };
+    }
+
+    case "START_OPERATION": {
+      if (state.phase !== "playing") return state;
+      const military = state.military;
+      const cost = 15;
+      if (state.politics.stats.politicalPower < cost) return state;
+      const operation: Operation = {
+        id: `op-${military.operations.length}-${military.elapsedMinutes}`,
+        name: action.name,
+        objective: action.objective,
+        regionId: action.regionId,
+        priority: action.priority,
+        unitIds: action.unitIds,
+        fleetIds: action.fleetIds,
+        airWingIds: action.airWingIds,
+        startedAtMinute: military.elapsedMinutes,
+      };
+      return {
+        ...state,
+        politics: { ...state.politics, stats: { ...state.politics.stats, politicalPower: state.politics.stats.politicalPower - cost } },
+        military: { ...military, operations: [...military.operations, operation] },
+      };
+    }
+
+    case "END_OPERATION": {
+      if (state.phase !== "playing") return state;
+      const military = state.military;
+      return { ...state, military: { ...military, operations: military.operations.filter((op) => op.id !== action.operationId) } };
+    }
+
+    case "MILITARY_COOPERATION_ACTION": {
+      if (state.phase !== "playing") return state;
+      const military = state.military;
+      const template = findAllianceCooperation(action.cooperationId);
+      if (!template) return state;
+      const isAlly = state.diplomacy.factions.some((faction) => faction.leaderCountryId === state.playerCountryId && faction.memberCountryIds.includes(action.countryId));
+      if (!isAlly) return state;
+      if (state.politics.stats.politicalPower < template.politicalPowerCost) return state;
+
+      const effects: MilitaryEffect[] = bindMilitaryEffectsToCountry(template.effects, action.countryId);
+      const result = applyMilitaryEffects(effects, military.forces, military.personnel);
+      const diplomacyEffects: DiplomacyEffect[] = result.relationDeltas.map((delta) => ({ type: "modify_relation", countryId: delta.countryId, amount: delta.amount, label: delta.label }));
+      const diplomacyResult = applyDiplomacyEffects(diplomacyEffects, state.diplomacy.relations, state.diplomacy.trade, state.diplomacy.regionalTension, state.diplomacy.elapsedMinutes);
+
+      return {
+        ...state,
+        politics: {
+          ...state.politics,
+          stats: {
+            ...state.politics.stats,
+            politicalPower: state.politics.stats.politicalPower - template.politicalPowerCost + result.politicalPowerDelta,
+            governmentSupport: clampPercent(state.politics.stats.governmentSupport + result.governmentSupportDelta),
+          },
+        },
+        diplomacy: { ...state.diplomacy, relations: diplomacyResult.relations },
+        military: { ...military, forces: result.forces, personnel: result.personnel },
+      };
+    }
+
+    case "RESPOND_MILITARY_EVENT": {
+      const military = state.military;
+      const notice = military.pendingNotices[0];
+      if (!notice || notice.kind !== "military_event") return state;
+      const template = findMilitaryEvent(notice.eventId);
+      const option = template?.options.find((o) => o.id === action.optionId);
+      if (!template || !option) return { ...state, military: { ...military, pendingNotices: military.pendingNotices.slice(1) } };
+
+      const result = applyMilitaryEffects(option.effects, military.forces, military.personnel);
+      const diplomacyEffects: DiplomacyEffect[] = result.relationDeltas.map((delta) => ({ type: "modify_relation", countryId: delta.countryId, amount: delta.amount, label: delta.label }));
+      const diplomacyResult = applyDiplomacyEffects(diplomacyEffects, state.diplomacy.relations, state.diplomacy.trade, state.diplomacy.regionalTension, state.diplomacy.elapsedMinutes);
+
+      return {
+        ...state,
+        politics: {
+          ...state.politics,
+          stats: {
+            ...state.politics.stats,
+            politicalPower: state.politics.stats.politicalPower + result.politicalPowerDelta,
+            governmentSupport: clampPercent(state.politics.stats.governmentSupport + result.governmentSupportDelta),
+          },
+        },
+        diplomacy: { ...state.diplomacy, relations: diplomacyResult.relations },
+        military: { ...military, forces: result.forces, personnel: result.personnel, pendingNotices: military.pendingNotices.slice(1) },
+      };
+    }
+
+    case "ACK_MILITARY_NOTICE": {
+      if (state.military.pendingNotices.length === 0) return state;
+      return { ...state, military: { ...state.military, pendingNotices: state.military.pendingNotices.slice(1) } };
+    }
+
+    case "RESPOND_ARMED_ATTACK": {
+      const military = state.military;
+      const notice = military.pendingNotices[0];
+      if (!notice || notice.kind !== "armed_attack") return state;
+      const enemyCountryId = notice.enemyCountryId;
+
+      const immediateEffects: MilitaryEffect[] =
+        action.response === "defend"
+          ? [
+              { type: "modify_capability", category: "land", amount: 3 },
+              { type: "modify_capability", category: "air", amount: 3 },
+              { type: "modify_government_support", amount: 2 },
+            ]
+          : action.response === "issue_statement"
+            ? [
+                { type: "modify_relation", countryId: enemyCountryId, amount: -3, label: "抗議声明" },
+                { type: "modify_government_support", amount: 1 },
+              ]
+            : action.response === "diplomatic_talks"
+              ? [
+                  { type: "modify_relation", countryId: enemyCountryId, amount: 5, label: "外交交渉" },
+                  { type: "modify_government_support", amount: -2 },
+                ]
+              : [{ type: "modify_government_support", amount: 1 }]; // request_ally_support: 同盟国への連絡そのものは外交側で処理
+
+      const result = applyMilitaryEffects(immediateEffects, military.forces, military.personnel);
+      const diplomacyEffects: DiplomacyEffect[] = result.relationDeltas.map((delta) => ({ type: "modify_relation", countryId: delta.countryId, amount: delta.amount, label: delta.label }));
+      let diplomacyRelations = applyDiplomacyEffects(diplomacyEffects, state.diplomacy.relations, state.diplomacy.trade, state.diplomacy.regionalTension, state.diplomacy.elapsedMinutes).relations;
+
+      if (action.response === "request_ally_support") {
+        const allyIds = state.diplomacy.factions
+          .filter((faction) => faction.leaderCountryId === state.playerCountryId)
+          .flatMap((faction) => faction.memberCountryIds)
+          .filter((id) => id !== state.playerCountryId);
+        const allySupportEffects: DiplomacyEffect[] = allyIds.map((id) => ({ type: "modify_relation", countryId: id, amount: 5, label: "支援要請" }));
+        diplomacyRelations = applyDiplomacyEffects(allySupportEffects, diplomacyRelations, state.diplomacy.trade, state.diplomacy.regionalTension, state.diplomacy.elapsedMinutes).relations;
+      }
+
+      // 防衛作戦は、準備が整った増援が後から戦力に加わる（指示書12章：動員には時間がかかる、と同じ発想）。
+      const scheduledEffects =
+        action.response === "defend"
+          ? [
+              ...military.scheduledEffects,
+              {
+                id: `defend-reinforce-${military.elapsedMinutes}`,
+                atMinute: military.elapsedMinutes + 7 * MILITARY_MINUTES_PER_DAY,
+                effects: [
+                  { type: "modify_capability" as const, category: "land" as const, amount: 5 },
+                  { type: "modify_capability" as const, category: "missile" as const, amount: 3 },
+                ],
+              },
+            ]
+          : military.scheduledEffects;
+
+      return {
+        ...state,
+        politics: { ...state.politics, stats: { ...state.politics.stats, governmentSupport: clampPercent(state.politics.stats.governmentSupport + result.governmentSupportDelta) } },
+        diplomacy: { ...state.diplomacy, relations: diplomacyRelations },
+        military: { ...military, forces: result.forces, personnel: result.personnel, scheduledEffects, pendingNotices: military.pendingNotices.slice(1) },
+      };
+    }
+
+    case "ADJUST_PRODUCTION_FACTORIES": {
+      if (state.phase !== "playing") return state;
+      const military = state.military;
+      const line = military.productionLines.find((l) => l.itemId === action.itemId);
+      if (!line) return state;
+      const nextFactories = Math.max(0, Math.min(10, line.factories + action.delta));
+      if (nextFactories === line.factories) return state;
+      const cost = action.delta > 0 ? 5 * action.delta : 0;
+      if (state.politics.stats.politicalPower < cost) return state;
+      const productionLines = military.productionLines.map((l) => (l.itemId === action.itemId ? { ...l, factories: nextFactories } : l));
+      return {
+        ...state,
+        politics: { ...state.politics, stats: { ...state.politics.stats, politicalPower: state.politics.stats.politicalPower - cost } },
+        military: { ...military, productionLines },
+      };
+    }
 
     default:
       return state;

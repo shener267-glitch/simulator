@@ -10,6 +10,16 @@ import { EconomyScreen } from "../economy/EconomyScreen";
 import { ResearchScreen } from "../research/ResearchScreen";
 import { DiplomacyScreen } from "../diplomacy/DiplomacyScreen";
 import { DiplomaticNoticeModal } from "../diplomacy/DiplomaticNoticeModal";
+import { MilitaryScreen } from "../military/MilitaryScreen";
+import { DefensePolicyScreen } from "../military/DefensePolicyScreen";
+import { OperationalMapScreen } from "../military/OperationalMapScreen";
+import { UnitsScreen } from "../military/UnitsScreen";
+import { NavyScreen } from "../military/NavyScreen";
+import { AirForceScreen } from "../military/AirForceScreen";
+import { ProductionScreen } from "../military/ProductionScreen";
+import { IntelligenceScreen } from "../military/IntelligenceScreen";
+import { WarScreen } from "../military/WarScreen";
+import { MilitaryNoticeModal } from "../military/MilitaryNoticeModal";
 import { findCountry, findCountryByIsoNumeric } from "../../data/countries";
 import { findFocus } from "../../data/focuses";
 import { formatDateTime } from "../../engine/gameTime";
@@ -19,6 +29,8 @@ import type { Speed } from "../../types/gameTime";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
 
 const SPEEDS: Speed[] = [1, 2, 4, 8];
+
+type MilitarySubScreen = "map" | "units" | "navy" | "air" | "production" | "intelligence" | "policy" | "war";
 
 const CATEGORIES: { id: CategoryId; emoji: string; label: string }[] = [
   { id: "politics", emoji: "🏛", label: "政治" },
@@ -30,10 +42,6 @@ const CATEGORIES: { id: CategoryId; emoji: string; label: string }[] = [
   { id: "intelligence", emoji: "🕵", label: "情報" },
   { id: "overview", emoji: "📊", label: "国家" },
 ];
-
-const CATEGORY_LABEL: Record<CategoryId, string> = Object.fromEntries(
-  CATEGORIES.map((c) => [c.id, c.label]),
-) as Record<CategoryId, string>;
 
 /** 国家方針の進行カード（指示書19章）。クリックすると国家方針ツリーを開く。 */
 function FocusProgressCard({ onOpen }: { onOpen: () => void }) {
@@ -68,6 +76,7 @@ export function MainGameScreen() {
   const dispatch = useGameDispatch();
   const [focusTreeOpen, setFocusTreeOpen] = useState(false);
   const [diplomacyFocusCountryId, setDiplomacyFocusCountryId] = useState<string | null>(null);
+  const [militarySubScreen, setMilitarySubScreen] = useState<MilitarySubScreen | null>(null);
 
   const player = findCountry(state.countries, state.playerCountryId ?? "");
   const inspected = state.inspectingCountryId
@@ -75,6 +84,7 @@ export function MainGameScreen() {
     : undefined;
   const notice = state.politics.pendingNotices[0];
   const diplomaticNotice = state.diplomacy.pendingNotices[0];
+  const militaryNotice = state.military.pendingNotices[0];
   const relationLines = state.diplomacy.mapOverlayEnabled
     ? Object.keys(state.diplomacy.relations)
         .map((id) => {
@@ -196,26 +206,44 @@ export function MainGameScreen() {
 
       {state.activeCategory === "research" && <ResearchScreen onClose={() => dispatch({ type: "OPEN_CATEGORY", id: null })} />}
 
+      {state.activeCategory === "military" && (
+        <MilitaryScreen
+          onClose={() => dispatch({ type: "OPEN_CATEGORY", id: null })}
+          onOpenMap={() => setMilitarySubScreen("map")}
+          onOpenUnits={() => setMilitarySubScreen("units")}
+          onOpenNavy={() => setMilitarySubScreen("navy")}
+          onOpenAirForce={() => setMilitarySubScreen("air")}
+          onOpenProduction={() => setMilitarySubScreen("production")}
+          onOpenIntelligence={() => setMilitarySubScreen("intelligence")}
+          onOpenDefensePolicy={() => setMilitarySubScreen("policy")}
+          onOpenWar={() => setMilitarySubScreen("war")}
+        />
+      )}
+
+      {state.activeCategory === "production" && <ProductionScreen onClose={() => dispatch({ type: "OPEN_CATEGORY", id: null })} />}
+
+      {state.activeCategory === "intelligence" && <IntelligenceScreen onClose={() => dispatch({ type: "OPEN_CATEGORY", id: null })} />}
+
       {state.activeCategory === "overview" && player && (
         <Modal title="国家" onClose={() => dispatch({ type: "OPEN_CATEGORY", id: null })}>
           <NationalOverviewPanel country={player} />
         </Modal>
       )}
 
-      {state.activeCategory && !["politics", "economy", "diplomacy", "research", "overview"].includes(state.activeCategory) && (
-        <Modal title={CATEGORY_LABEL[state.activeCategory]} onClose={() => dispatch({ type: "OPEN_CATEGORY", id: null })}>
-          <p className="py-6 text-center text-[0.85rem] text-body-muted">
-            {CATEGORY_LABEL[state.activeCategory]}
-            <br />
-            Phase 5以降で実装予定
-          </p>
-        </Modal>
-      )}
+      {militarySubScreen === "map" && <OperationalMapScreen onClose={() => setMilitarySubScreen(null)} />}
+      {militarySubScreen === "units" && <UnitsScreen onClose={() => setMilitarySubScreen(null)} />}
+      {militarySubScreen === "navy" && <NavyScreen onClose={() => setMilitarySubScreen(null)} />}
+      {militarySubScreen === "air" && <AirForceScreen onClose={() => setMilitarySubScreen(null)} />}
+      {militarySubScreen === "production" && <ProductionScreen onClose={() => setMilitarySubScreen(null)} />}
+      {militarySubScreen === "intelligence" && <IntelligenceScreen onClose={() => setMilitarySubScreen(null)} />}
+      {militarySubScreen === "policy" && <DefensePolicyScreen onClose={() => setMilitarySubScreen(null)} />}
+      {militarySubScreen === "war" && <WarScreen onClose={() => setMilitarySubScreen(null)} />}
 
       {focusTreeOpen && <FocusTreeScreen onClose={() => setFocusTreeOpen(false)} />}
 
       {notice && <FocusNoticeModal notice={notice} />}
       {!notice && diplomaticNotice && <DiplomaticNoticeModal notice={diplomaticNotice} />}
+      {!notice && !diplomaticNotice && militaryNotice && <MilitaryNoticeModal notice={militaryNotice} />}
     </div>
   );
 }

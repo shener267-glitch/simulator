@@ -18,6 +18,7 @@ const CATEGORY_LABELS: Record<ResearchCategory, string> = {
   energy: "⚡ エネルギー",
   industry: "🏭 産業技術",
   aerospace: "🚀 航空宇宙",
+  military: "🪖 軍事技術",
 };
 
 function statusOf(

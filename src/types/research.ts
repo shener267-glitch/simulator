@@ -1,11 +1,13 @@
-/** 研究カテゴリー（指示書14章）。 */
-export type ResearchCategory = "basic_science" | "computing_ai" | "energy" | "industry" | "aerospace";
+/** 研究カテゴリー（指示書14章、Phase 5で軍事研究を追加）。 */
+export type ResearchCategory = "basic_science" | "computing_ai" | "energy" | "industry" | "aerospace" | "military";
 
 export type TechEffect =
   | { type: "modify_research_speed"; amount: number }
   | { type: "modify_political_power_gain"; amount: number }
   | { type: "add_national_modifier"; id: string; label: string }
-  | { type: "unlock_tech"; techId: string };
+  | { type: "unlock_tech"; techId: string }
+  /** 陸海空・ミサイル・その他の能力指数。Phase 5指示書19・30章、研究↔軍事の接続。 */
+  | { type: "modify_military_capability"; category: "land" | "sea" | "air" | "missile" | "other"; amount: number };
 
 export interface TechTemplate {
   id: string;

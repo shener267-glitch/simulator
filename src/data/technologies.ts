@@ -260,6 +260,172 @@ export const TECHNOLOGIES: TechTemplate[] = [
     effects: [{ type: "modify_research_speed", amount: 8 }],
     position: { x: 200, y: 790 },
   },
+
+  // --- 軍事研究（Phase 5指示書19・30章）。既存の航空技術（aerospace）から
+  // 次世代戦闘機へ枝分かれさせるほかは、新設の「軍事基盤」を根にした
+  // 独立した一本の枝にした。ドクトリン5種（指示書18章）も、研究システムと
+  // 接続するという指示書の指定どおり、この枝の技術として扱う。
+  {
+    id: "gunji-kihon",
+    name: "軍事基盤",
+    category: "military",
+    description: "防衛省・自衛隊の研究開発体制そのもの。ここから各分野の軍事研究が始まる。",
+    durationDays: 60,
+    prerequisites: ["kiso-kagaku"],
+    effects: [],
+    position: { x: 1800, y: 40 },
+  },
+  {
+    id: "bousei-jushi",
+    name: "防勢重視ドクトリン",
+    category: "military",
+    description: "防衛能力そのものを強化する運用思想（指示書18章）。",
+    durationDays: 100,
+    prerequisites: ["gunji-kihon"],
+    effects: [
+      { type: "modify_military_capability", category: "land", amount: 8 },
+      { type: "add_national_modifier", id: "bousei-doctrine", label: "防勢重視ドクトリン" },
+    ],
+    position: { x: 1550, y: 190 },
+  },
+  {
+    id: "kidou-jushi",
+    name: "機動重視ドクトリン",
+    category: "military",
+    description: "機動力・即応能力を強化する運用思想。",
+    durationDays: 100,
+    prerequisites: ["gunji-kihon"],
+    effects: [
+      { type: "modify_military_capability", category: "land", amount: 4 },
+      { type: "modify_military_capability", category: "missile", amount: 4 },
+      { type: "add_national_modifier", id: "kidou-doctrine", label: "機動重視ドクトリン" },
+    ],
+    position: { x: 1700, y: 190 },
+  },
+  {
+    id: "kaiyou-bouei",
+    name: "海洋防衛ドクトリン",
+    category: "military",
+    description: "海上交通路の防衛・艦隊運用を重視する運用思想。",
+    durationDays: 100,
+    prerequisites: ["gunji-kihon"],
+    effects: [
+      { type: "modify_military_capability", category: "sea", amount: 8 },
+      { type: "add_national_modifier", id: "kaiyou-doctrine", label: "海洋防衛ドクトリン" },
+    ],
+    position: { x: 1850, y: 190 },
+  },
+  {
+    id: "koukuu-yuusei",
+    name: "航空優勢ドクトリン",
+    category: "military",
+    description: "航空戦力を重視する運用思想。",
+    durationDays: 100,
+    prerequisites: ["gunji-kihon"],
+    effects: [
+      { type: "modify_military_capability", category: "air", amount: 8 },
+      { type: "add_national_modifier", id: "koukuu-doctrine", label: "航空優勢ドクトリン" },
+    ],
+    position: { x: 2000, y: 190 },
+  },
+  {
+    id: "tougou-bouei-doctrine",
+    name: "統合防衛ドクトリン",
+    category: "military",
+    description: "陸海空・宇宙・サイバーを統合運用する、四つのドクトリンの先にある集大成。",
+    durationDays: 150,
+    prerequisites: ["bousei-jushi", "kidou-jushi", "kaiyou-bouei", "koukuu-yuusei"],
+    effects: [
+      { type: "modify_military_capability", category: "other", amount: 15 },
+      { type: "add_national_modifier", id: "tougou-doctrine", label: "統合防衛体制" },
+    ],
+    position: { x: 1800, y: 340 },
+  },
+  {
+    id: "bouku-gijutsu",
+    name: "防空技術",
+    category: "military",
+    description: "レーダー・迎撃システムなど、防空の基礎技術。",
+    durationDays: 150,
+    prerequisites: ["gunji-kihon"],
+    effects: [{ type: "modify_military_capability", category: "missile", amount: 5 }],
+    position: { x: 1550, y: 490 },
+  },
+  {
+    id: "tougou-bouku",
+    name: "統合防空",
+    category: "military",
+    description: "レーダー・戦闘機・地対空ミサイルを一体運用する防空網。",
+    durationDays: 220,
+    prerequisites: ["bouku-gijutsu"],
+    effects: [
+      { type: "modify_military_capability", category: "missile", amount: 10 },
+      { type: "modify_military_capability", category: "air", amount: 5 },
+    ],
+    position: { x: 1550, y: 640 },
+  },
+  {
+    id: "jisedai-bouku",
+    name: "次世代防空",
+    category: "military",
+    description: "統合防空をさらに進めた、次の世代の防空システム。",
+    durationDays: 280,
+    prerequisites: ["tougou-bouku"],
+    effects: [
+      { type: "modify_military_capability", category: "missile", amount: 15 },
+      { type: "add_national_modifier", id: "jisedai-bouku-mod", label: "次世代防空網" },
+    ],
+    position: { x: 1550, y: 790 },
+  },
+  {
+    id: "kantei-gijutsu",
+    name: "艦艇技術",
+    category: "military",
+    description: "護衛艦・潜水艦など、艦艇建造の基礎技術。",
+    durationDays: 180,
+    prerequisites: ["gunji-kihon"],
+    effects: [{ type: "modify_military_capability", category: "sea", amount: 5 }],
+    position: { x: 1750, y: 490 },
+  },
+  {
+    id: "jisedai-goeikan",
+    name: "次世代護衛艦",
+    category: "military",
+    description: "艦艇技術を活かした、次の世代の護衛艦。",
+    durationDays: 260,
+    prerequisites: ["kantei-gijutsu"],
+    effects: [
+      { type: "modify_military_capability", category: "sea", amount: 15 },
+      { type: "add_national_modifier", id: "jisedai-goeikan-mod", label: "次世代護衛艦就役" },
+    ],
+    position: { x: 1750, y: 640 },
+  },
+  {
+    id: "shingata-missile",
+    name: "新型ミサイル",
+    category: "military",
+    description: "統合防空の先に見えてきた、新型の対艦・長距離ミサイル。",
+    durationDays: 220,
+    prerequisites: ["tougou-bouku"],
+    effects: [
+      { type: "modify_military_capability", category: "missile", amount: 12 },
+      { type: "add_national_modifier", id: "shingata-missile-mod", label: "新型ミサイル配備" },
+    ],
+    position: { x: 1750, y: 790 },
+  },
+  {
+    id: "jisedai-sentouki",
+    name: "次世代戦闘機",
+    category: "military",
+    description: "既存の航空技術を軍用に発展させた、次の世代の戦闘機。",
+    durationDays: 280,
+    prerequisites: ["koukuu-gijutsu"],
+    effects: [
+      { type: "modify_military_capability", category: "air", amount: 15 },
+      { type: "add_national_modifier", id: "jisedai-sentouki-mod", label: "次世代戦闘機配備" },
+    ],
+    position: { x: 1950, y: 490 },
+  },
 ];
 
 export function findTech(id: string): TechTemplate | undefined {
@@ -269,4 +435,4 @@ export function findTech(id: string): TechTemplate | undefined {
 /** 基礎科学は最初から完了扱い——研究基盤そのものはすでにある、という前提。 */
 export const AUTO_COMPLETED_TECH_IDS = ["kiso-kagaku"];
 
-export const TREE_SIZE = { width: 1600, height: 1020 };
+export const TREE_SIZE = { width: 2150, height: 1020 };

@@ -71,10 +71,16 @@ export default {
         },
       },
       animation: {
-        "fade-up": "fade-up 320ms cubic-bezier(0.22, 1, 0.36, 1) both",
+        // transformを使うアニメーションは`both`にしない——完了後もtranslateYが
+        // 残ると、そのカードの中にネストしたModalの`fixed`がビューポートでは
+        // なくこのカード基準になってしまう（position:fixedの包含ブロックの
+        // 仕様どおり、transform:noneでない要素は子孫のfixedの基準になる）。
+        // `backwards`なら開始前の見た目は保ちつつ、終了後はtransformが
+        // 正しくnoneへ戻る。
+        "fade-up": "fade-up 320ms cubic-bezier(0.22, 1, 0.36, 1) backwards",
         "fade-in": "fade-in 260ms ease-out both",
         "fade-in-slow": "fade-in 900ms ease-out both",
-        "sheet-up": "sheet-up 280ms cubic-bezier(0.22, 1, 0.36, 1) both",
+        "sheet-up": "sheet-up 280ms cubic-bezier(0.22, 1, 0.36, 1) backwards",
         caret: "caret 1.1s step-end infinite",
       },
     },

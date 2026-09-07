@@ -599,3 +599,315 @@ describe("national focus ↔ diplomacy connection (Phase 4指示書16章)", () =
     expect(computeRelation(next.diplomacy.relations.CHN)).toBe(before + 8);
   });
 });
+
+function withPoliticalPower(state: GameState, amount: number): GameState {
+  return { ...state, politics: { ...state.politics, stats: { ...state.politics.stats, politicalPower: amount } } };
+}
+
+describe("defense readiness and mobilization (Phase 5指示書11・12章)", () => {
+  it("escalates readiness, deducting its political power cost", () => {
+    const state = withPoliticalPower(playing(), 100);
+    const next = gameReducer(state, { type: "SET_READINESS", level: "alert" });
+    expect(next.military.readiness).toBe("alert");
+    expect(next.politics.stats.politicalPower).toBe(92); // cost 8
+  });
+
+  it("refuses to escalate readiness without enough political power", () => {
+    const state = withPoliticalPower(playing(), 1);
+    const next = gameReducer(state, { type: "SET_READINESS", level: "emergency" });
+    expect(next).toBe(state);
+  });
+
+  it("de-escalates readiness for free", () => {
+    let state = withPoliticalPower(playing(), 100);
+    state = gameReducer(state, { type: "SET_READINESS", level: "high_alert" });
+    const powerAfterEscalating = state.politics.stats.politicalPower;
+    const next = gameReducer(state, { type: "SET_READINESS", level: "normal" });
+    expect(next.military.readiness).toBe("normal");
+    expect(next.politics.stats.politicalPower).toBe(powerAfterEscalating);
+  });
+
+  it("is a no-op when setting the same readiness level again", () => {
+    const state = playing();
+    const next = gameReducer(state, { type: "SET_READINESS", level: "normal" });
+    expect(next).toBe(state);
+  });
+
+  it("escalates mobilization, deducting its political power cost", () => {
+    const state = withPoliticalPower(playing(), 100);
+    const next = gameReducer(state, { type: "SET_MOBILIZATION", state: "partial" });
+    expect(next.military.mobilization).toBe("partial");
+    expect(next.politics.stats.politicalPower).toBe(85); // cost 15
+  });
+});
+
+describe("conscription policy (指示書13章)", () => {
+  it("changes policy, deducting its cost and bumping the mobilizable pool for draft", () => {
+    const state = withPoliticalPower(playing(), 100);
+    const before = state.military.personnel.mobilizable;
+    const next = gameReducer(state, { type: "SET_CONSCRIPTION_POLICY", policy: "draft" });
+    expect(next.military.conscriptionPolicy).toBe("draft");
+    expect(next.politics.stats.politicalPower).toBe(80); // cost 20
+    expect(next.military.personnel.mobilizable).toBe(before + 50000);
+  });
+
+  it("refuses to change policy without enough political power", () => {
+    const state = withPoliticalPower(playing(), 5);
+    const next = gameReducer(state, { type: "SET_CONSCRIPTION_POLICY", policy: "draft" });
+    expect(next).toBe(state);
+  });
+
+  it("is a no-op when setting the same policy again", () => {
+    const state = playing();
+    const next = gameReducer(state, { type: "SET_CONSCRIPTION_POLICY", policy: "volunteer" });
+    expect(next).toBe(state);
+  });
+});
+
+describe("unit movement (指示書7章)", () => {
+  it("sends a garrisoned unit moving, with an arrival time derived from travel days", () => {
+    const state = playing();
+    const next = gameReducer(state, { type: "MOVE_UNIT", unitId: "div1", destinationRegionId: "tohoku" }); // kanto→tohoku、隣接1区間
+    const unit = next.military.units.find((u) => u.id === "div1")!;
+    expect(unit.status).toBe("moving");
+    expect(unit.destinationRegionId).toBe("tohoku");
+    expect(unit.arrivalAtMinute).toBeCloseTo(1.5 * 1440);
+  });
+
+  it("refuses to move a unit that is already moving", () => {
+    let state = playing();
+    state = gameReducer(state, { type: "MOVE_UNIT", unitId: "div1", destinationRegionId: "tohoku" });
+    const next = gameReducer(state, { type: "MOVE_UNIT", unitId: "div1", destinationRegionId: "kyushu" });
+    expect(next).toBe(state);
+  });
+
+  it("resolves the move once the arrival minute has passed, on TICK", () => {
+    let state = playing();
+    state = {
+      ...state,
+      military: {
+        ...state.military,
+        units: state.military.units.map((u) => (u.id === "div1" ? { ...u, status: "moving", destinationRegionId: "tohoku", arrivalAtMinute: 1 } : u)),
+      },
+    };
+    state = gameReducer(state, { type: "SET_SPEED", speed: 8 });
+    const next = gameReducer(state, { type: "TICK" });
+    const unit = next.military.units.find((u) => u.id === "div1")!;
+    expect(unit.status).toBe("garrison");
+    expect(unit.regionId).toBe("tohoku");
+    expect(unit.destinationRegionId).toBeUndefined();
+  });
+});
+
+describe("fleet and air wing missions (指示書8・9章)", () => {
+  it("sets a fleet's mission directly", () => {
+    const state = playing();
+    const next = gameReducer(state, { type: "SET_FLEET_MISSION", fleetId: "escort-flotilla-1", mission: "blockade" });
+    expect(next.military.fleets.find((f) => f.id === "escort-flotilla-1")?.mission).toBe("blockade");
+  });
+
+  it("sets an air wing's mission directly", () => {
+    const state = playing();
+    const next = gameReducer(state, { type: "SET_AIRWING_MISSION", airWingId: "chitose-wing", mission: "intercept" });
+    expect(next.military.airWings.find((w) => w.id === "chitose-wing")?.mission).toBe("intercept");
+  });
+});
+
+describe("operations (指示書25・26章、国家レベルの意思決定であって一マスずつの操作ではない)", () => {
+  it("starts an operation, deducting its political power cost", () => {
+    const state = withPoliticalPower(playing(), 100);
+    const next = gameReducer(state, { type: "START_OPERATION", name: "南西諸島防衛", objective: "南西諸島の防衛", regionId: "nansei", priority: "defense", unitIds: ["brigade15"], fleetIds: [], airWingIds: ["naha-wing"] });
+    expect(next.politics.stats.politicalPower).toBe(85); // cost 15
+    expect(next.military.operations).toHaveLength(1);
+    expect(next.military.operations[0].name).toBe("南西諸島防衛");
+  });
+
+  it("refuses to start an operation without enough political power", () => {
+    const state = withPoliticalPower(playing(), 1);
+    const next = gameReducer(state, { type: "START_OPERATION", name: "x", objective: "x", regionId: "kanto", priority: "defense", unitIds: [], fleetIds: [], airWingIds: [] });
+    expect(next).toBe(state);
+  });
+
+  it("ends an operation", () => {
+    let state = withPoliticalPower(playing(), 100);
+    state = gameReducer(state, { type: "START_OPERATION", name: "x", objective: "x", regionId: "kanto", priority: "defense", unitIds: [], fleetIds: [], airWingIds: [] });
+    const operationId = state.military.operations[0].id;
+    const next = gameReducer(state, { type: "END_OPERATION", operationId });
+    expect(next.military.operations).toEqual([]);
+  });
+});
+
+describe("alliance military cooperation (指示書27章)", () => {
+  function withAlly(state: GameState): GameState {
+    return { ...state, diplomacy: { ...state.diplomacy, factions: [{ id: "f1", name: "テスト陣営", leaderCountryId: "JPN", memberCountryIds: ["JPN", "USA"] }] } };
+  }
+
+  it("refuses cooperation with a country that is not an ally", () => {
+    const state = withPoliticalPower(playing(), 100);
+    const next = gameReducer(state, { type: "MILITARY_COOPERATION_ACTION", countryId: "USA", cooperationId: "intel_sharing" });
+    expect(next).toBe(state);
+  });
+
+  it("applies cooperation effects — capability and relation — once an alliance exists", () => {
+    let state = withPoliticalPower(playing(), 100);
+    state = withAlly(state);
+    const relationBefore = computeRelation(state.diplomacy.relations.USA);
+    const landBefore = state.military.forces.land.capability;
+    const next = gameReducer(state, { type: "MILITARY_COOPERATION_ACTION", countryId: "USA", cooperationId: "joint_exercise" });
+    expect(next.politics.stats.politicalPower).toBe(90); // cost 10
+    expect(computeRelation(next.diplomacy.relations.USA)).toBeGreaterThan(relationBefore);
+    expect(next.military.forces.land.capability).toBeGreaterThan(landBefore);
+  });
+});
+
+describe("military notices (指示書31・32章)", () => {
+  it("resolves a military event that has response options, applying the chosen effect", () => {
+    let state = playing();
+    state = { ...state, military: { ...state.military, pendingNotices: [{ kind: "military_event", eventId: "scramble" }] } };
+    const missileBefore = state.military.forces.missile.capability;
+    const next = gameReducer(state, { type: "RESPOND_MILITARY_EVENT", optionId: "raise-alert" });
+    expect(next.military.pendingNotices).toEqual([]);
+    expect(next.military.forces.missile.capability).toBeGreaterThan(missileBefore);
+  });
+
+  it("acknowledges a flavor-only military notice", () => {
+    let state = playing();
+    state = { ...state, military: { ...state.military, pendingNotices: [{ kind: "military_event", eventId: "joint-drill" }] } };
+    const next = gameReducer(state, { type: "ACK_MILITARY_NOTICE" });
+    expect(next.military.pendingNotices).toEqual([]);
+  });
+});
+
+describe("armed attack (指示書23章、戦争は通知が立った時点で始まっている)", () => {
+  function withArmedAttackNotice(state: GameState): GameState {
+    return { ...state, military: { ...state.military, pendingNotices: [{ kind: "armed_attack", enemyCountryId: "RUS" }] } };
+  }
+
+  it("defending applies immediate capability gains and schedules a delayed reinforcement", () => {
+    let state = withArmedAttackNotice(playing());
+    const landBefore = state.military.forces.land.capability;
+    const supportBefore = state.politics.stats.governmentSupport;
+    const next = gameReducer(state, { type: "RESPOND_ARMED_ATTACK", response: "defend" });
+    expect(next.military.pendingNotices).toEqual([]);
+    expect(next.military.forces.land.capability).toBeGreaterThan(landBefore);
+    expect(next.politics.stats.governmentSupport).toBeGreaterThan(supportBefore);
+    expect(next.military.scheduledEffects).toHaveLength(1);
+    expect(next.military.scheduledEffects[0].atMinute).toBe(7 * 1440);
+  });
+
+  it("diplomatic talks raise relation with the enemy but cost domestic support", () => {
+    let state = withArmedAttackNotice(playing());
+    const relationBefore = computeRelation(state.diplomacy.relations.RUS);
+    const supportBefore = state.politics.stats.governmentSupport;
+    const next = gameReducer(state, { type: "RESPOND_ARMED_ATTACK", response: "diplomatic_talks" });
+    expect(computeRelation(next.diplomacy.relations.RUS)).toBeGreaterThan(relationBefore);
+    expect(next.politics.stats.governmentSupport).toBeLessThan(supportBefore);
+  });
+
+  it("a scheduled reinforcement applies once its minute arrives, on TICK", () => {
+    let state = withArmedAttackNotice(playing());
+    state = gameReducer(state, { type: "RESPOND_ARMED_ATTACK", response: "defend" });
+    const missileBefore = state.military.forces.missile.capability;
+    state = { ...state, military: { ...state.military, scheduledEffects: state.military.scheduledEffects.map((e) => ({ ...e, atMinute: 1 })) } };
+    state = gameReducer(state, { type: "SET_SPEED", speed: 8 });
+    const next = gameReducer(state, { type: "TICK" });
+    expect(next.military.forces.missile.capability).toBeGreaterThan(missileBefore);
+    expect(next.military.scheduledEffects).toEqual([]);
+  });
+});
+
+describe("equipment production (指示書16章)", () => {
+  it("increases factories, deducting political power", () => {
+    const state = withPoliticalPower(playing(), 100);
+    const next = gameReducer(state, { type: "ADJUST_PRODUCTION_FACTORIES", itemId: "fighter", delta: 1 });
+    expect(next.military.productionLines.find((l) => l.itemId === "fighter")?.factories).toBe(4);
+    expect(next.politics.stats.politicalPower).toBe(95); // cost 5
+  });
+
+  it("decreases factories for free, floored at 0", () => {
+    const state = playing();
+    const next = gameReducer(state, { type: "ADJUST_PRODUCTION_FACTORIES", itemId: "fighter", delta: -100 });
+    expect(next.military.productionLines.find((l) => l.itemId === "fighter")?.factories).toBe(0);
+    expect(next.politics.stats.politicalPower).toBe(state.politics.stats.politicalPower);
+  });
+
+  it("caps factories at 10", () => {
+    const state = withPoliticalPower(playing(), 1000);
+    const next = gameReducer(state, { type: "ADJUST_PRODUCTION_FACTORIES", itemId: "fighter", delta: 100 });
+    expect(next.military.productionLines.find((l) => l.itemId === "fighter")?.factories).toBe(10);
+  });
+});
+
+describe("military tick integration", () => {
+  it("advances a near-complete production line into a capability gain on TICK", () => {
+    let state = playing();
+    state = {
+      ...state,
+      military: {
+        ...state.military,
+        productionLines: state.military.productionLines.map((l) => (l.itemId === "tank" ? { ...l, factories: 100, efficiencyPercent: 100, accumulatedOutput: 1.999 } : l)), // 戦車1台=2、あと僅かで完成
+      },
+    };
+    const landBefore = state.military.forces.land.capability;
+    state = gameReducer(state, { type: "SET_SPEED", speed: 8 });
+    const next = gameReducer(state, { type: "TICK" });
+    expect(next.military.forces.land.capability).toBeGreaterThan(landBefore);
+  });
+
+  it("keeps intel confidence within the 20..95 band after many ticks", () => {
+    let state = playing();
+    state = gameReducer(state, { type: "SET_SPEED", speed: 8 });
+    for (let i = 0; i < 50; i++) state = gameReducer(state, { type: "TICK" });
+    for (const snapshot of Object.values(state.military.intel)) {
+      expect(snapshot.confidencePercent).toBeGreaterThanOrEqual(20);
+      expect(snapshot.confidencePercent).toBeLessThanOrEqual(95);
+    }
+  });
+
+  it("keeps a full 12-region front status record intact across ticks while at war", () => {
+    let state = playing();
+    state = {
+      ...state,
+      military: {
+        ...state.military,
+        war: {
+          enemyCountryId: "RUS",
+          startedAtMinute: 0,
+          frontStatus: { hokkaido: "tense", tohoku: "calm", kanto: "calm", chubu: "calm", kinki: "calm", chugoku: "calm", shikoku: "calm", kyushu: "calm", nansei: "calm", sea_of_japan: "active", east_china_sea: "calm", pacific_ocean: "calm" },
+        },
+      },
+    };
+    state = gameReducer(state, { type: "SET_SPEED", speed: 8 });
+    const next = gameReducer(state, { type: "TICK" });
+    expect(Object.keys(next.military.war!.frontStatus)).toHaveLength(12);
+  });
+
+  it("applies readiness's daily drag on GDP growth and diplomatic relations", () => {
+    let state = playing();
+    state = { ...state, military: { ...state.military, readiness: "emergency" } };
+    state = gameReducer(state, { type: "SET_SPEED", speed: 8 });
+    const growthBefore = state.economy.stats.gdpGrowthRate;
+    const relationBefore = computeRelation(state.diplomacy.relations.USA);
+    const next = gameReducer(state, { type: "TICK" });
+    expect(next.economy.stats.gdpGrowthRate).toBeLessThan(growthBefore);
+    expect(computeRelation(next.diplomacy.relations.USA)).toBeLessThan(relationBefore);
+  });
+});
+
+describe("research ↔ military connection (Phase 5指示書19・30章)", () => {
+  it("raises land capability when 防勢重視ドクトリン completes", () => {
+    let state = playing();
+    state = {
+      ...state,
+      research: {
+        ...state.research,
+        completedTechIds: [...state.research.completedTechIds, "gunji-kihon"],
+        active: [{ techId: "bousei-jushi", daysElapsed: 100 - 1 / 1440 }],
+      },
+    };
+    state = gameReducer(state, { type: "SET_SPEED", speed: 1 });
+    const before = state.military.forces.land.capability;
+    const next = gameReducer(state, { type: "TICK" });
+    expect(next.military.forces.land.capability).toBe(before + 8);
+  });
+});
