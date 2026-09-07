@@ -188,16 +188,16 @@ export function MainGameScreen() {
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-ink">
-      {/* 上部：国家情報・リソース・時間（指示書4章） */}
+      {/* 上部：国家情報・リソース・時間（指示書4章）。スマホの縦持ちでもはみ出さないよう2段にまとめる。 */}
       <header className="flex shrink-0 flex-col gap-2 border-b border-line px-3 pt-[calc(0.6rem+env(safe-area-inset-top))] pb-2">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-2">
           <button
             type="button"
             onClick={() => openCategory("overview")}
             title="国家概要を開く"
-            className="flex min-w-0 items-center gap-2 text-left"
+            className="flex min-w-0 flex-1 items-center gap-2 text-left"
           >
-            <span className="text-[1.3rem] leading-none" aria-hidden>
+            <span className="shrink-0 text-[1.3rem] leading-none" aria-hidden>
               {player?.flag}
             </span>
             <span className="min-w-0 truncate">
@@ -208,21 +208,26 @@ export function MainGameScreen() {
             </span>
           </button>
 
-          <div className="flex shrink-0 items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2">
+            <div className="text-right leading-tight">
+              <p className="figures text-[0.8rem] text-body">{formatDate(state.gameTime)}</p>
+              <p className="figures text-[0.72rem] text-body-muted">{formatTime(state.gameTime)}</p>
+            </div>
+
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setNotifOpen((open) => !open)}
                 aria-label="通知"
                 title="通知"
-                className={`figures flex h-9 items-center gap-1 rounded border px-2.5 text-[0.85rem] transition-colors ${
+                className={`figures flex h-11 items-center gap-1 rounded border px-2.5 text-[0.85rem] transition-colors ${
                   notifCount > 0 ? "border-brass/60 bg-brass/10 text-brass" : "border-line text-body-muted"
                 }`}
               >
                 🔔 {notifCount}
               </button>
               {notifOpen && (
-                <div className="absolute right-0 top-11 z-30 w-72 rounded-lg border border-line-strong bg-ink-panel shadow-2xl shadow-black/50">
+                <div className="absolute right-0 top-12 z-30 w-72 max-w-[85vw] rounded-lg border border-line-strong bg-ink-panel shadow-2xl shadow-black/50">
                   <p className="border-b border-line px-3 py-2 text-[0.72rem] font-medium tracking-wider text-brass">📰 最近の出来事</p>
                   <ul className="max-h-56 overflow-y-auto px-3 py-2 text-[0.78rem] text-body-muted">
                     {recentEvents.length === 0 ? (
@@ -234,46 +239,40 @@ export function MainGameScreen() {
                 </div>
               )}
             </div>
-
-            <div className="text-right leading-tight">
-              <p className="figures text-[0.85rem] text-body">{formatDate(state.gameTime)}</p>
-              <p className="figures text-[0.75rem] text-body-muted">{formatTime(state.gameTime)}</p>
-            </div>
-
-            <div className="flex gap-1">
-              <button
-                type="button"
-                onClick={() => dispatch({ type: "SET_SPEED", speed: 0 })}
-                aria-label="一時停止"
-                title="一時停止"
-                className={`flex h-9 w-9 items-center justify-center rounded border text-[0.8rem] transition-colors ${
-                  state.gameTime.speed === 0 ? "border-brass bg-brass/15 text-brass" : "border-line text-body-muted hover:border-line-strong"
-                }`}
-              >
-                ⏸
-              </button>
-              {SPEEDS.map((speed) => (
-                <button
-                  key={speed}
-                  type="button"
-                  onClick={() => dispatch({ type: "SET_SPEED", speed })}
-                  aria-label={`速度${speed}倍`}
-                  title={`速度${speed}倍`}
-                  className={`figures flex h-9 w-9 items-center justify-center rounded border text-[0.75rem] transition-colors ${
-                    state.gameTime.speed === speed
-                      ? "border-brass bg-brass/15 text-brass"
-                      : "border-line text-body-muted hover:border-line-strong"
-                  }`}
-                >
-                  {SPEED_SYMBOL[speed]}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
 
-        {/* 国家リソース（指示書4章：政治・経済・人的資源・工業力などを省略しない） */}
-        <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+        {/* 速度・国家リソースを1本の横スクロール帯にまとめ、幅の狭い画面でもはみ出させない（指示書4章：省略しない） */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+          <div className="flex shrink-0 items-center gap-1 border-r border-line pr-1.5">
+            <button
+              type="button"
+              onClick={() => dispatch({ type: "SET_SPEED", speed: 0 })}
+              aria-label="一時停止"
+              title="一時停止"
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded border text-[0.8rem] transition-colors ${
+                state.gameTime.speed === 0 ? "border-brass bg-brass/15 text-brass" : "border-line text-body-muted hover:border-line-strong"
+              }`}
+            >
+              ⏸
+            </button>
+            {SPEEDS.map((speed) => (
+              <button
+                key={speed}
+                type="button"
+                onClick={() => dispatch({ type: "SET_SPEED", speed })}
+                aria-label={`速度${speed}倍`}
+                title={`速度${speed}倍`}
+                className={`figures flex h-11 w-11 shrink-0 items-center justify-center rounded border text-[0.75rem] transition-colors ${
+                  state.gameTime.speed === speed
+                    ? "border-brass bg-brass/15 text-brass"
+                    : "border-line text-body-muted hover:border-line-strong"
+                }`}
+              >
+                {SPEED_SYMBOL[speed]}
+              </button>
+            ))}
+          </div>
           <ResourcePill
             emoji="🏛"
             value={`${Math.round(state.politics.stats.politicalPower)} (${state.politics.stats.politicalPowerPerDay >= 0 ? "+" : ""}${state.politics.stats.politicalPowerPerDay.toFixed(1)}/日)`}
@@ -380,8 +379,10 @@ export function MainGameScreen() {
         )}
       </div>
 
-      {/* 下部：国家管理・軍事・マップ操作UI（指示書8・9章） */}
-      <nav className="flex shrink-0 flex-wrap gap-px border-t border-line bg-line pb-[env(safe-area-inset-bottom)]">
+      {/* 下部：国家管理・軍事・マップ操作UI（指示書8・9章）。
+          19項目を折り返すと縦持ちスマホで地図が数センチまで潰れるため、
+          項目は削らずに1段の横スクロール帯にする。 */}
+      <nav className="flex shrink-0 gap-px overflow-x-auto border-t border-line bg-line pb-[env(safe-area-inset-bottom)]">
         {MENU_BUTTONS.map((button) => {
           const key = button.kind === "category" ? button.id : button.kind;
           return (
@@ -389,7 +390,7 @@ export function MainGameScreen() {
               key={key}
               type="button"
               onClick={() => activateMenu(button)}
-              className={`flex min-h-[52px] min-w-[64px] flex-1 flex-col items-center justify-center gap-0.5 bg-ink-panel py-1 text-[0.65rem] transition-colors hover:bg-ink-raised ${
+              className={`flex min-h-[52px] w-[68px] shrink-0 flex-col items-center justify-center gap-0.5 bg-ink-panel py-1 text-[0.65rem] transition-colors hover:bg-ink-raised ${
                 isMenuActive(button) ? "text-brass" : "text-body-muted hover:text-body"
               }`}
             >
