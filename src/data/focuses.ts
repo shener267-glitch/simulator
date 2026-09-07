@@ -79,12 +79,16 @@ export const JAPAN_FOCUSES: FocusTemplate[] = [
     effects: [
       { type: "modify_stability", amount: 2 },
       { type: "add_national_modifier", id: "nichibei-doumei", label: "日米同盟強化" },
+      { type: "modify_relation", countryId: "USA", amount: 8 },
     ],
     position: { x: 620, y: 320 },
   },
   {
     id: "ajia-gaikou",
     name: "アジア外交",
+    // 【ゲーム上の設定】相手国はプレイ可能国カタログ（指示書2章の7か国）に
+    // 合わせて中国とした。指示書のモックアップにある韓国はこのカタログに
+    // 無いため、Phase 4では対象に含めていない——国を増やす話は別途。
     description: "近隣国・地域との経済・安全保障両面の関係を強める。",
     durationDays: 45,
     prerequisites: ["gaikou-seisaku"],
@@ -92,6 +96,7 @@ export const JAPAN_FOCUSES: FocusTemplate[] = [
     effects: [
       { type: "modify_political_power_gain", amount: 0.5 },
       { type: "unlock_focus", focusId: "chiiki-anpo" },
+      { type: "modify_relation", countryId: "CHN", amount: 8 },
     ],
     position: { x: 800, y: 320 },
   },

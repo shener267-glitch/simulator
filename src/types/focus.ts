@@ -12,7 +12,9 @@ export type FocusEffect =
   | { type: "trigger_event"; eventId: string }
   | { type: "unlock_focus"; focusId: string }
   /** 研究速度への加算ボーナス(%)。指示書19章、国家方針と研究の接続。 */
-  | { type: "modify_research_speed"; amount: number };
+  | { type: "modify_research_speed"; amount: number }
+  /** 特定国との関係値。Phase 4指示書16章、国家方針と外交の接続。 */
+  | { type: "modify_relation"; countryId: string; amount: number };
 
 export interface FocusTemplate {
   id: string;

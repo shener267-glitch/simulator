@@ -1,6 +1,7 @@
 import type { FocusEffect, FocusProgress, FocusTemplate } from "../types/focus";
 import type { NationalModifier, Party, PoliticalStats } from "../types/politics";
 import { findFocus } from "../data/focuses";
+import { COUNTRIES } from "../data/countries";
 
 /** 1日=1440分。ゲーム内時間(分)から国家方針の進捗(日)へ換算する基準。 */
 export const MINUTES_PER_DAY = 1440;
@@ -45,6 +46,8 @@ export interface FocusEffectResult {
   triggeredEventIds: string[];
   /** 研究速度への加算ボーナス(%)。Phase 3、指示書19章の国家方針↔研究の接続。 */
   researchSpeedDelta: number;
+  /** 特定国との関係値の変化。Phase 4、指示書16章の国家方針↔外交の接続。 */
+  relationDeltas: { countryId: string; amount: number }[];
 }
 
 /**
@@ -65,6 +68,7 @@ export function applyFocusEffects(
   let nextUnlocked = unlockedFocusIds;
   const triggeredEventIds: string[] = [];
   let researchSpeedDelta = 0;
+  const relationDeltas: { countryId: string; amount: number }[] = [];
 
   for (const effect of effects) {
     switch (effect.type) {
@@ -97,6 +101,9 @@ export function applyFocusEffects(
       case "modify_research_speed":
         researchSpeedDelta += effect.amount;
         break;
+      case "modify_relation":
+        relationDeltas.push({ countryId: effect.countryId, amount: effect.amount });
+        break;
     }
   }
 
@@ -107,6 +114,7 @@ export function applyFocusEffects(
     unlockedFocusIds: nextUnlocked,
     triggeredEventIds,
     researchSpeedDelta,
+    relationDeltas,
   };
 }
 
@@ -139,5 +147,9 @@ export function describeFocusEffect(effect: FocusEffect, parties: Party[]): stri
     }
     case "modify_research_speed":
       return `研究速度 ${signed(effect.amount)}%`;
+    case "modify_relation": {
+      const country = COUNTRIES.find((c) => c.id === effect.countryId);
+      return `${country?.name ?? effect.countryId}との関係 ${signed(effect.amount)}`;
+    }
   }
 }

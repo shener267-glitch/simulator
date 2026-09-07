@@ -1,8 +1,14 @@
 import { COUNTRY_FEATURES } from "../../data/worldTopology";
 import { findCountryByIsoNumeric } from "../../data/countries";
-import { WORLD_HEIGHT, WORLD_WIDTH, pathOf } from "../../engine/worldMap";
+import { WORLD_HEIGHT, WORLD_WIDTH, centroidOf, pathOf } from "../../engine/worldMap";
 import { usePanZoom } from "../../hooks/usePanZoom";
 import type { Country } from "../../types/country";
+
+/** 外交の関係線オーバーレイ一本分（指示書24章、任意機能）。 */
+export interface RelationLine {
+  isoNumeric: string;
+  relation: number;
+}
 
 interface WorldMapProps {
   /** その時点の国家データ。`state.countries`を渡す——静的カタログではなく。 */
@@ -10,6 +16,14 @@ interface WorldMapProps {
   /** 強調表示する国（選択中の国）のISO数字コード。 */
   selectedIsoNumeric?: string | null;
   onSelectCountry: (isoNumeric: string) => void;
+  /** 外交画面と連動した関係線オーバーレイ。省略時は描かない。 */
+  relationLines?: RelationLine[];
+}
+
+function relationLineColor(relation: number): string {
+  if (relation >= 20) return "#5fa87e";
+  if (relation <= -20) return "#c0564f";
+  return "#8a95a5";
 }
 
 /**
@@ -18,13 +32,17 @@ interface WorldMapProps {
  * 使っていない——見た目はここで独自に組んだもの。パン・ズームの仕組みは
  * `usePanZoom`（国家方針ツリーと共有）。
  */
-export function WorldMap({ countries, selectedIsoNumeric, onSelectCountry }: WorldMapProps) {
+export function WorldMap({ countries, selectedIsoNumeric, onSelectCountry, relationLines }: WorldMapProps) {
   const { svgRef, transform, handlers } = usePanZoom<SVGSVGElement>({
     width: WORLD_WIDTH,
     height: WORLD_HEIGHT,
     hitAttribute: "data-iso-numeric",
     onTap: onSelectCountry,
   });
+
+  const featureByIso = new Map(COUNTRY_FEATURES.filter((f) => f.id).map((f) => [f.id as string, f]));
+  const originFeature = selectedIsoNumeric ? featureByIso.get(selectedIsoNumeric) : undefined;
+  const originCentroid = originFeature ? centroidOf(originFeature) : null;
 
   return (
     <svg
@@ -54,6 +72,29 @@ export function WorldMap({ countries, selectedIsoNumeric, onSelectCountry }: Wor
             />
           );
         })}
+
+        {relationLines && originCentroid && (
+          <g pointerEvents="none">
+            {relationLines.map((line) => {
+              const feature = featureByIso.get(line.isoNumeric);
+              const target = feature ? centroidOf(feature) : null;
+              if (!target) return null;
+              return (
+                <line
+                  key={line.isoNumeric}
+                  x1={originCentroid[0]}
+                  y1={originCentroid[1]}
+                  x2={target[0]}
+                  y2={target[1]}
+                  stroke={relationLineColor(line.relation)}
+                  strokeWidth={1.5}
+                  strokeOpacity={0.85}
+                  vectorEffect="non-scaling-stroke"
+                />
+              );
+            })}
+          </g>
+        )}
       </g>
     </svg>
   );

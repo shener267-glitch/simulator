@@ -8,9 +8,12 @@ import { FocusTreeScreen } from "../politics/FocusTreeScreen";
 import { FocusNoticeModal } from "../politics/FocusNoticeModal";
 import { EconomyScreen } from "../economy/EconomyScreen";
 import { ResearchScreen } from "../research/ResearchScreen";
+import { DiplomacyScreen } from "../diplomacy/DiplomacyScreen";
+import { DiplomaticNoticeModal } from "../diplomacy/DiplomaticNoticeModal";
 import { findCountry, findCountryByIsoNumeric } from "../../data/countries";
 import { findFocus } from "../../data/focuses";
 import { formatDateTime } from "../../engine/gameTime";
+import { computeRelation } from "../../engine/diplomacy";
 import type { CategoryId } from "../../types/game";
 import type { Speed } from "../../types/gameTime";
 import { useGameDispatch, useGameState } from "../../state/GameContext";
@@ -64,12 +67,23 @@ export function MainGameScreen() {
   const state = useGameState();
   const dispatch = useGameDispatch();
   const [focusTreeOpen, setFocusTreeOpen] = useState(false);
+  const [diplomacyFocusCountryId, setDiplomacyFocusCountryId] = useState<string | null>(null);
 
   const player = findCountry(state.countries, state.playerCountryId ?? "");
   const inspected = state.inspectingCountryId
     ? findCountryByIsoNumeric(state.countries, state.inspectingCountryId)
     : undefined;
   const notice = state.politics.pendingNotices[0];
+  const diplomaticNotice = state.diplomacy.pendingNotices[0];
+  const relationLines = state.diplomacy.mapOverlayEnabled
+    ? Object.keys(state.diplomacy.relations)
+        .map((id) => {
+          const country = findCountry(state.countries, id);
+          if (!country) return null;
+          return { isoNumeric: country.isoNumeric, relation: computeRelation(state.diplomacy.relations[id]) };
+        })
+        .filter((line): line is { isoNumeric: string; relation: number } => line !== null)
+    : undefined;
 
   return (
     <div className="flex h-dvh flex-col">
@@ -120,6 +134,7 @@ export function MainGameScreen() {
           countries={state.countries}
           selectedIsoNumeric={player?.isoNumeric}
           onSelectCountry={(iso) => dispatch({ type: "INSPECT_COUNTRY", id: iso })}
+          relationLines={relationLines}
         />
       </div>
 
@@ -141,7 +156,22 @@ export function MainGameScreen() {
 
       {state.inspectingCountryId && (
         <Modal title="国家情報" onClose={() => dispatch({ type: "INSPECT_COUNTRY", id: null })}>
-          <CountryInfoPanel isoNumeric={state.inspectingCountryId} country={inspected} />
+          <div className="flex flex-col gap-4">
+            <CountryInfoPanel isoNumeric={state.inspectingCountryId} country={inspected} />
+            {inspected && inspected.id !== state.playerCountryId && state.diplomacy.relations[inspected.id] && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDiplomacyFocusCountryId(inspected.id);
+                  dispatch({ type: "INSPECT_COUNTRY", id: null });
+                  dispatch({ type: "OPEN_CATEGORY", id: "diplomacy" });
+                }}
+                className="flex min-h-[48px] items-center justify-center gap-2 rounded border border-brass/60 bg-brass/10 text-[0.9rem] font-medium text-brass transition-colors hover:bg-brass/20"
+              >
+                🌍 外交関係を見る
+              </button>
+            )}
+          </div>
         </Modal>
       )}
 
@@ -154,6 +184,16 @@ export function MainGameScreen() {
 
       {state.activeCategory === "economy" && <EconomyScreen onClose={() => dispatch({ type: "OPEN_CATEGORY", id: null })} />}
 
+      {state.activeCategory === "diplomacy" && (
+        <DiplomacyScreen
+          onClose={() => {
+            setDiplomacyFocusCountryId(null);
+            dispatch({ type: "OPEN_CATEGORY", id: null });
+          }}
+          initialCountryId={diplomacyFocusCountryId}
+        />
+      )}
+
       {state.activeCategory === "research" && <ResearchScreen onClose={() => dispatch({ type: "OPEN_CATEGORY", id: null })} />}
 
       {state.activeCategory === "overview" && player && (
@@ -162,12 +202,12 @@ export function MainGameScreen() {
         </Modal>
       )}
 
-      {state.activeCategory && !["politics", "economy", "research", "overview"].includes(state.activeCategory) && (
+      {state.activeCategory && !["politics", "economy", "diplomacy", "research", "overview"].includes(state.activeCategory) && (
         <Modal title={CATEGORY_LABEL[state.activeCategory]} onClose={() => dispatch({ type: "OPEN_CATEGORY", id: null })}>
           <p className="py-6 text-center text-[0.85rem] text-body-muted">
             {CATEGORY_LABEL[state.activeCategory]}
             <br />
-            Phase 4以降で実装予定
+            Phase 5以降で実装予定
           </p>
         </Modal>
       )}
@@ -175,6 +215,7 @@ export function MainGameScreen() {
       {focusTreeOpen && <FocusTreeScreen onClose={() => setFocusTreeOpen(false)} />}
 
       {notice && <FocusNoticeModal notice={notice} />}
+      {!notice && diplomaticNotice && <DiplomaticNoticeModal notice={diplomaticNotice} />}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createInitialState } from "../../src/state/initialState";
 import { gameReducer } from "../../src/state/gameReducer";
 import { DEFAULT_COUNTRY_ID } from "../../src/data/countries";
+import { computeRelation } from "../../src/engine/diplomacy";
 import type { GameState } from "../../src/types/game";
 
 describe("the title → select → playing flow", () => {
@@ -361,5 +362,240 @@ describe("national focus ↔ research connection (指示書19章)", () => {
     state = gameReducer(state, { type: "SET_SPEED", speed: 1 });
     const next = gameReducer(state, { type: "TICK" });
     expect(next.research.speedBonusPercent).toBe(10);
+  });
+});
+
+describe("diplomatic actions (Phase 4指示書10〜12章)", () => {
+  function withPoliticalPower(state: GameState, amount: number): GameState {
+    return { ...state, politics: { ...state.politics, stats: { ...state.politics.stats, politicalPower: amount } } };
+  }
+
+  it("decides an affordable action, deducting its cost and scheduling its effect", () => {
+    const state = withPoliticalPower(playing(), 100);
+    const next = gameReducer(state, { type: "DECIDE_DIPLOMATIC_ACTION", countryId: "USA", actionId: "send_envoy" });
+    expect(next.politics.stats.politicalPower).toBe(92); // cost 8
+    expect(next.diplomacy.scheduledEffects.length).toBeGreaterThan(0);
+    expect(next.diplomacy.relations.USA.lastActionAtMinute.send_envoy).toBe(0);
+  });
+
+  it("refuses an action that cannot be afforded", () => {
+    const state = withPoliticalPower(playing(), 1);
+    const next = gameReducer(state, { type: "DECIDE_DIPLOMATIC_ACTION", countryId: "USA", actionId: "send_envoy" });
+    expect(next).toBe(state);
+  });
+
+  it("refuses an action against a country this player has no diplomacy data for", () => {
+    const state = withPoliticalPower(playing(), 100);
+    const next = gameReducer(state, { type: "DECIDE_DIPLOMATIC_ACTION", countryId: "JPN", actionId: "send_envoy" });
+    expect(next).toBe(state);
+  });
+
+  it("applies a scheduled action stage once its minute arrives, and clears it from the queue", () => {
+    let state = withPoliticalPower(playing(), 100);
+    state = gameReducer(state, { type: "DECIDE_DIPLOMATIC_ACTION", countryId: "USA", actionId: "send_envoy" }); // 即時段階
+    const before = state.diplomacy.relations.USA;
+    state = gameReducer(state, { type: "SET_SPEED", speed: 1 });
+    const next = gameReducer(state, { type: "TICK" });
+    expect(next.diplomacy.relations.USA.modifiers.length).toBeGreaterThan(before.modifiers.length);
+    expect(next.diplomacy.scheduledEffects).toHaveLength(0);
+  });
+
+  it("propose_summit schedules a pending summit instead of an immediate effect", () => {
+    const state = withPoliticalPower(playing(), 100);
+    const next = gameReducer(state, { type: "DECIDE_DIPLOMATIC_ACTION", countryId: "USA", actionId: "propose_summit" });
+    expect(next.diplomacy.scheduledEffects).toHaveLength(0);
+    expect(next.diplomacy.pendingSummits).toEqual([{ id: "USA-0", countryId: "USA", readyAtMinute: 14 * 1440 }]);
+  });
+});
+
+describe("treaties (Phase 4指示書13章)", () => {
+  function withPoliticalPower(state: GameState, amount: number): GameState {
+    return { ...state, politics: { ...state.politics, stats: { ...state.politics.stats, politicalPower: amount } } };
+  }
+
+  it("signs a treaty once relation and political power both qualify", () => {
+    const state = withPoliticalPower(playing(), 100); // 日米関係の初期値は友好条約のしきい値(20)を上回る
+    const next = gameReducer(state, { type: "DECIDE_TREATY", countryId: "USA", treatyTypeId: "friendship", clauseIds: [] });
+    expect(next.politics.stats.politicalPower).toBe(90); // cost 10
+    expect(next.diplomacy.relations.USA.treaties).toHaveLength(1);
+    expect(next.diplomacy.relations.USA.treaties[0].treatyTypeId).toBe("friendship");
+  });
+
+  it("refuses to sign the same treaty type with the same country twice", () => {
+    let state = withPoliticalPower(playing(), 100);
+    state = gameReducer(state, { type: "DECIDE_TREATY", countryId: "USA", treatyTypeId: "friendship", clauseIds: [] });
+    const again = gameReducer(state, { type: "DECIDE_TREATY", countryId: "USA", treatyTypeId: "friendship", clauseIds: [] });
+    expect(again).toBe(state);
+  });
+
+  it("refuses a treaty the relation does not yet qualify for", () => {
+    const state = withPoliticalPower(playing(), 100); // ロシアとの初期関係値は相互防衛条約のしきい値(50)に遠く届かない
+    const next = gameReducer(state, { type: "DECIDE_TREATY", countryId: "RUS", treatyTypeId: "mutual_defense", clauseIds: [] });
+    expect(next).toBe(state);
+  });
+
+  it("adds an optional clause's cost on top of the treaty's base cost", () => {
+    const state = withPoliticalPower(playing(), 100);
+    const next = gameReducer(state, { type: "DECIDE_TREATY", countryId: "USA", treatyTypeId: "trade_agreement", clauseIds: ["tariff_relief"] });
+    expect(next.politics.stats.politicalPower).toBe(100 - 15 - 8); // 通商協定15 + 関税優遇条項8
+  });
+});
+
+describe("diplomatic stances (指示書20章)", () => {
+  it("toggles a stance on and off", () => {
+    let state = playing();
+    state = gameReducer(state, { type: "TOGGLE_STANCE", stanceId: "free_trade" });
+    expect(state.diplomacy.stances).toEqual(["free_trade"]);
+    state = gameReducer(state, { type: "TOGGLE_STANCE", stanceId: "free_trade" });
+    expect(state.diplomacy.stances).toEqual([]);
+  });
+});
+
+describe("summit invitations (指示書9章：承諾／延期／辞退)", () => {
+  it("fires a summit_invite notice, pausing the game, once the prep period has fully elapsed", () => {
+    let state = playing();
+    state = { ...state, diplomacy: { ...state.diplomacy, pendingSummits: [{ id: "USA-0", countryId: "USA", readyAtMinute: 1 }] } };
+    state = gameReducer(state, { type: "SET_SPEED", speed: 1 });
+    const next = gameReducer(state, { type: "TICK" });
+    expect(next.diplomacy.pendingNotices).toEqual([{ kind: "summit_invite", countryId: "USA" }]);
+    expect(next.gameTime.speed).toBe(0);
+  });
+
+  it("accepting raises relation and government support, and clears the pending summit", () => {
+    let state = playing();
+    state = {
+      ...state,
+      diplomacy: {
+        ...state.diplomacy,
+        pendingSummits: [{ id: "USA-0", countryId: "USA", readyAtMinute: 0 }],
+        pendingNotices: [{ kind: "summit_invite", countryId: "USA" }],
+      },
+    };
+    const relationBefore = state.diplomacy.relations.USA.modifiers.length;
+    const supportBefore = state.politics.stats.governmentSupport;
+    const next = gameReducer(state, { type: "RESPOND_SUMMIT_INVITE", response: "accept" });
+    expect(next.diplomacy.pendingNotices).toEqual([]);
+    expect(next.diplomacy.pendingSummits).toEqual([]);
+    expect(next.diplomacy.relations.USA.modifiers.length).toBeGreaterThan(relationBefore);
+    expect(next.politics.stats.governmentSupport).toBeGreaterThan(supportBefore);
+  });
+
+  it("rescheduling pushes the summit's ready time out without resolving it", () => {
+    let state = playing();
+    state = {
+      ...state,
+      diplomacy: {
+        ...state.diplomacy,
+        elapsedMinutes: 500,
+        pendingSummits: [{ id: "USA-0", countryId: "USA", readyAtMinute: 500 }],
+        pendingNotices: [{ kind: "summit_invite", countryId: "USA" }],
+      },
+    };
+    const next = gameReducer(state, { type: "RESPOND_SUMMIT_INVITE", response: "reschedule" });
+    expect(next.diplomacy.pendingNotices).toEqual([]);
+    expect(next.diplomacy.pendingSummits).toEqual([{ id: "USA-0", countryId: "USA", readyAtMinute: 500 + 14 * 1440 }]);
+  });
+
+  it("declining removes the summit and slightly lowers relation", () => {
+    let state = playing();
+    state = {
+      ...state,
+      diplomacy: {
+        ...state.diplomacy,
+        pendingSummits: [{ id: "USA-0", countryId: "USA", readyAtMinute: 0 }],
+        pendingNotices: [{ kind: "summit_invite", countryId: "USA" }],
+      },
+    };
+    const before = computeRelation(state.diplomacy.relations.USA);
+    const next = gameReducer(state, { type: "RESPOND_SUMMIT_INVITE", response: "decline" });
+    expect(next.diplomacy.pendingSummits).toEqual([]);
+    expect(computeRelation(next.diplomacy.relations.USA)).toBeLessThan(before);
+  });
+});
+
+describe("simplified international crises (指示書18章)", () => {
+  it("resolves the notice and applies the chosen option's effects", () => {
+    let state = playing();
+    state = { ...state, diplomacy: { ...state.diplomacy, pendingNotices: [{ kind: "international_crisis", crisisId: "border-incident" }] } };
+    const before = computeRelation(state.diplomacy.relations.CHN);
+    const next = gameReducer(state, { type: "RESPOND_DIPLOMATIC_CRISIS", optionId: "quiet-channel" });
+    expect(next.diplomacy.pendingNotices).toEqual([]);
+    expect(computeRelation(next.diplomacy.relations.CHN)).toBeGreaterThan(before);
+    expect(next.diplomacy.eventLog.length).toBeGreaterThan(0);
+  });
+});
+
+describe("diplomatic news notices", () => {
+  it("acknowledges one notice at a time", () => {
+    let state = playing();
+    state = {
+      ...state,
+      diplomacy: { ...state.diplomacy, pendingNotices: [{ kind: "diplomatic_event", eventId: "news-trade-friction" }] },
+    };
+    const next = gameReducer(state, { type: "ACK_DIPLOMATIC_NOTICE" });
+    expect(next.diplomacy.pendingNotices).toEqual([]);
+  });
+});
+
+describe("factions (指示書14章)", () => {
+  it("proposes a faction led by the player, then invites a country whose relation qualifies", () => {
+    let state = playing();
+    state = gameReducer(state, { type: "PROPOSE_FACTION", name: "テスト陣営" });
+    expect(state.diplomacy.factions).toHaveLength(1);
+    const factionId = state.diplomacy.factions[0].id;
+
+    const next = gameReducer(state, { type: "INVITE_TO_FACTION", factionId, countryId: "USA" }); // 日米関係55は30以上
+    expect(next.diplomacy.factions[0].memberCountryIds).toContain("USA");
+  });
+
+  it("refuses to invite a country whose relation is too low", () => {
+    let state = playing();
+    state = gameReducer(state, { type: "PROPOSE_FACTION", name: "テスト陣営" });
+    const factionId = state.diplomacy.factions[0].id;
+    const next = gameReducer(state, { type: "INVITE_TO_FACTION", factionId, countryId: "RUS" }); // 関係値-20
+    expect(next).toBe(state);
+  });
+});
+
+describe("map relation overlay toggle", () => {
+  it("toggles on and off", () => {
+    let state = playing();
+    expect(state.diplomacy.mapOverlayEnabled).toBe(false);
+    state = gameReducer(state, { type: "TOGGLE_MAP_OVERLAY" });
+    expect(state.diplomacy.mapOverlayEnabled).toBe(true);
+  });
+});
+
+describe("national focus ↔ diplomacy connection (Phase 4指示書16章)", () => {
+  it("raises relation with the USA when 日米関係強化 completes", () => {
+    let state = playing();
+    state = {
+      ...state,
+      politics: {
+        ...state.politics,
+        completedFocusIds: [...state.politics.completedFocusIds, "gaikou-seisaku"],
+        activeFocus: { focusId: "nichibei-kankei", daysElapsed: 45 - 1 / 1440 },
+      },
+    };
+    state = gameReducer(state, { type: "SET_SPEED", speed: 1 });
+    const before = computeRelation(state.diplomacy.relations.USA);
+    const next = gameReducer(state, { type: "TICK" });
+    expect(computeRelation(next.diplomacy.relations.USA)).toBe(before + 8);
+  });
+
+  it("raises relation with China when アジア外交 completes", () => {
+    let state = playing();
+    state = {
+      ...state,
+      politics: {
+        ...state.politics,
+        completedFocusIds: [...state.politics.completedFocusIds, "gaikou-seisaku"],
+        activeFocus: { focusId: "ajia-gaikou", daysElapsed: 45 - 1 / 1440 },
+      },
+    };
+    state = gameReducer(state, { type: "SET_SPEED", speed: 1 });
+    const before = computeRelation(state.diplomacy.relations.CHN);
+    const next = gameReducer(state, { type: "TICK" });
+    expect(computeRelation(next.diplomacy.relations.CHN)).toBe(before + 8);
   });
 });

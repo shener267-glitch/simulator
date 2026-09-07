@@ -1,5 +1,6 @@
 import type { Country } from "./country";
 import type { Budget, EconomyStats, ScheduledEconomyEffect } from "./economy";
+import type { DiplomacyState } from "./diplomacy";
 import type { FocusProgress } from "./focus";
 import type { GameTime } from "./gameTime";
 import type { Leader, NationalModifier, Party, PoliticalStats } from "./politics";
@@ -77,6 +78,7 @@ export interface GameState {
   politics: PoliticsState;
   economy: EconomyState;
   research: ResearchState;
+  diplomacy: DiplomacyState;
   /** メイン画面で地図をクリックして覗いている国。何も開いていなければnull。 */
   inspectingCountryId: string | null;
   /** 下部メニューでいま開いているカテゴリ。閉じていればnull。 */

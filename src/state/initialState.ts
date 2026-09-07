@@ -4,21 +4,24 @@ import { COUNTRIES, DEFAULT_COUNTRY_ID } from "../data/countries";
 import { createPoliticsState } from "./politics";
 import { createEconomyState } from "./economy";
 import { createResearchState } from "./research";
+import { createDiplomacyState } from "./diplomacy";
 
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 
 export function createInitialState(): GameState {
+  const countries = COUNTRIES.map((country) => ({ ...country }));
   return {
     saveVersion: SAVE_VERSION,
     phase: "title",
     selectedCountryId: DEFAULT_COUNTRY_ID,
     playerCountryId: null,
     gameTime: { ...DEFAULT_START, speed: 0 },
-    countries: COUNTRIES.map((country) => ({ ...country })),
+    countries,
     // ゲーム開始前のプレースホルダー。BEGIN_GAMEで実際に選ばれた国のものへ差し替える。
     politics: createPoliticsState(DEFAULT_COUNTRY_ID),
     economy: createEconomyState(DEFAULT_COUNTRY_ID),
     research: createResearchState(),
+    diplomacy: createDiplomacyState(DEFAULT_COUNTRY_ID, countries),
     inspectingCountryId: null,
     activeCategory: null,
   };

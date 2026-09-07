@@ -16,3 +16,9 @@ const path = geoPath(projection);
 export function pathOf(feature: (typeof COUNTRY_FEATURES)[number]): string {
   return path(feature) ?? "";
 }
+
+/** 国の重心座標（外交の関係線オーバーレイ用、指示書24章）。描けない形ならnull。 */
+export function centroidOf(feature: (typeof COUNTRY_FEATURES)[number]): [number, number] | null {
+  const centroid = path.centroid(feature);
+  return Number.isFinite(centroid[0]) && Number.isFinite(centroid[1]) ? centroid : null;
+}
