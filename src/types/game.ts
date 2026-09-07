@@ -9,7 +9,11 @@ import type { ResearchProgress } from "./research";
 
 export type Phase = "title" | "select" | "playing";
 
-/** 下部メニューの八カテゴリ（指示書8章）。国家以外はPhase 1では仮画面。 */
+/**
+ * 下部の国家管理メニュー（指示書8章）。HOI4のシステム一覧に沿って、実データを
+ * 持つもの（politics〜overview）と、まだ入口だけのもの（decisions以降）を
+ * 同じ入口の形で並べる——後者もPhase 1では仮画面だが、押せば必ず何かが開く。
+ */
 export type CategoryId =
   | "politics"
   | "economy"
@@ -18,7 +22,21 @@ export type CategoryId =
   | "research"
   | "production"
   | "intelligence"
-  | "overview";
+  | "overview"
+  | "decisions"
+  | "construction"
+  | "market"
+  | "trade"
+  | "logistics"
+  | "worldTension"
+  | "puppets"
+  | "resistance"
+  | "mio"
+  | "experimental"
+  | "faction";
+
+/** マップモード切替（指示書10章）。政治以外はPhase 1では見た目だけの仮実装。 */
+export type MapModeId = "political" | "terrain" | "supply" | "air" | "navy" | "war" | "infrastructure" | "construction";
 
 /**
  * 国家方針・研究が完了したとき／それが引いた簡易イベントを、画面中央に

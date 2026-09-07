@@ -209,9 +209,28 @@ export function usePanZoom<T extends SVGSVGElement>({
     return () => svg.removeEventListener("wheel", onWheel);
   }, [beginGesture, applyAt, clampScale]);
 
+  /** ビューポート中心を軸にズームする——マップモード切替UIの＋／−ボタン用（指示書7章）。 */
+  const zoomBy = useCallback(
+    (factor: number) => {
+      const svg = svgRef.current;
+      if (!svg) return;
+      const rect = svg.getBoundingClientRect();
+      const focal = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+      const g = beginGesture([focal], rect);
+      applyAt(focal, rect, g.anchor, clampScale(transformRef.current.scale * factor));
+    },
+    [beginGesture, applyAt, clampScale],
+  );
+
+  const resetView = useCallback(() => {
+    setTransform(clampTransform({ x: 0, y: 0, scale: 1 }));
+  }, [clampTransform]);
+
   return {
     svgRef,
     transform,
+    zoomBy,
+    resetView,
     handlers: {
       onPointerDown,
       onPointerMove,
